@@ -10,3 +10,10 @@ launch.json
 *.pyc
 *.csv
 *nohup.out*
+# generated simulation outputs (added by me)
+*.vtk
+*.tar.gz
+temperature_history.csv
+results/
+results_*/
+*_backup.py
