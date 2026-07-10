@@ -54,7 +54,7 @@ save_vtk(filename, 0.0)
 file_num = file_num + 1
 
 # ---- run settings ----
-STOP_FRACTION = 0.5     # 0.10 = 10% preview. Set to 1.0 for the real full run.
+STOP_FRACTION = 0.3     # 0.10 = 10% preview. Set to 1.0 for the real full run.
 N_FRAMES = 200           # more frames so the fast (1s) deposit sweeps get several frames each, not just the long dwell
 stop_time = STOP_FRACTION * endtime
 save_interval = stop_time / N_FRAMES
