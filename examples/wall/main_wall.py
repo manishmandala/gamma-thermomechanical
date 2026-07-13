@@ -24,6 +24,7 @@ def save_vtk(filename, time_value):
     S23 = transformation(S[0:n_e_save,:,4], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save)
     S13 = transformation(S[0:n_e_save,:,5], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save)
     active_grid = pv.UnstructuredGrid(active_cells, active_cell_type, points)
+    active_grid.cell_data['material'] = domain.element_mat[domain.active_elements]
     active_grid.point_data['temp'] = heat_solver.temperature[0:n_n_save].get()
     active_grid.point_data['U1'] = U[0:n_n_save,0].get()
     active_grid.point_data['U2'] = U[0:n_n_save,1].get()
@@ -54,7 +55,7 @@ save_vtk(filename, 0.0)
 file_num = file_num + 1
 
 # ---- run settings ----
-STOP_FRACTION = 0.3     # 0.10 = 10% preview. Set to 1.0 for the real full run.
+STOP_FRACTION = 0.1     # 0.10 = 10% preview. Set to 1.0 for the real full run.
 N_FRAMES = 200           # more frames so the fast (1s) deposit sweeps get several frames each, not just the long dwell
 stop_time = STOP_FRACTION * endtime
 save_interval = stop_time / N_FRAMES
