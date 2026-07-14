@@ -204,13 +204,34 @@ def derivate_shape_fnc_surface(parCoord):
                          [-oneMinusChsi, -onePlusChsi, onePlusChsi, oneMinusChsi]])
     return B
 
+def linear_mix(a, b, f):
+    return (1 - f) * a + f * b
+
+
+# Default per-property blend rule for *MAT_THERMAL_GRADED_TD regions - every
+# property defaults to linear rule-of-mixtures but can be overridden per
+# property via domain_mgr(mixing_rules=...), e.g. once real (non-linear)
+# mixture data justifies it for solidus/liquidus. Mirrors gradient_material.py's
+# MIXING_RULES so the same mental model applies whether blending happens at
+# preprocessing time (discrete bands) or at runtime (continuous field).
+DEFAULT_MIXING_RULES = {
+    'density': linear_mix,
+    'solidus': linear_mix,
+    'liquidus': linear_mix,
+    'latent': linear_mix,
+    'cp': linear_mix,
+    'cond': linear_mix,
+}
+
+
 class domain_mgr():
     def __init__(self, filename, sort_birth=True, toolpathdir='toolpath.crs', verbose=True, timestep_override=-1,
-                 input_data_dir="."):
+                 input_data_dir=".", mixing_rules=None):
         self.toolpath_file = toolpathdir
         self.filename = filename
         self.input_data_dir = input_data_dir
         self.sort_birth = sort_birth
+        self.mixing_rules = mixing_rules or DEFAULT_MIXING_RULES
         parCoords_element = np.array([[-1.0,-1.0,-1.0],[1.0,-1.0,-1.0],[1.0, 1.0,-1.0],[-1.0, 1.0,-1.0],
                                       [-1.0,-1.0,1.0],[1.0,-1.0, 1.0], [ 1.0,1.0,1.0],[-1.0, 1.0,1.0]]) * 0.5773502692
         parCoords_surface = np.array([[-1.0,-1.0],[-1.0, 1.0],[1.0,-1.0],[1.0,1.0]])* 0.5773502692
@@ -233,6 +254,8 @@ class domain_mgr():
         element_mat = []
         mat_thermal = []
         thermal_TD = {}
+        mat_graded = []
+        graded_TD = {}
         birth_list_element = []
         birth_list_node = []
         filename = self.filename
@@ -295,6 +318,7 @@ class domain_mgr():
                 elif line.split()[0] == '*END':
                     birth_list_node = [-1 for _ in range(len(nodes))]
                     birth_list_element = [0.0]*len(elements)
+                    composition_list_element = [0.0]*len(elements)
                     break
 
                 elif line.split()[0] == '*TOOL_FILE':
@@ -380,6 +404,30 @@ class domain_mgr():
                     cond = np.loadtxt(fullPath)
                     thermal_TD[int(text1[0])] = [Cp,cond]
 
+                # option *MAT_THERMAL_GRADED_TD - a continuous blend between two
+                # endpoint materials (A, B), embedded directly rather than
+                # referencing existing mat_thermal entries by ID. This is
+                # deliberate: mat_thermal/thermal_TD entries must be indexed
+                # sequentially (matID == file position + 1, see get_timestep) for
+                # a legacy reason, and a graded region that never registers here
+                # sidesteps that constraint entirely instead of having to satisfy it.
+                elif line.split()[0] == '*MAT_THERMAL_GRADED_TD':
+                    line = next(f)
+                    line = next(f)
+                    text1 = line.split()
+                    gradID = int(text1[0])
+                    mat_graded.append([gradID,
+                                        float(text1[1]), float(text1[2]), float(text1[3]), float(text1[4]),  # A: density, solidus, liquidus, latent
+                                        float(text1[5]), float(text1[6]), float(text1[7]), float(text1[8])])  # B: density, solidus, liquidus, latent
+                    line = next(f)
+                    CpA = np.loadtxt(os.path.join(self.input_data_dir, line.split()[0]))
+                    line = next(f)
+                    CondA = np.loadtxt(os.path.join(self.input_data_dir, line.split()[0]))
+                    line = next(f)
+                    CpB = np.loadtxt(os.path.join(self.input_data_dir, line.split()[0]))
+                    line = next(f)
+                    CondB = np.loadtxt(os.path.join(self.input_data_dir, line.split()[0]))
+                    graded_TD[gradID] = [CpA, CondA, CpB, CondB]
 
                 else:
                     line = next(f)
@@ -399,12 +447,23 @@ class domain_mgr():
                                 continue
                             text = line.split()
                             birth_list_element[int(float(text[1]))-element_base] = float(text[0])
+                    if line.split()[0] == '*ELEMENT_COMPOSITION':
+                        line = next(f)   # gradID header line (which *MAT_THERMAL_GRADED_TD block this table feeds - not needed for a single-region file, kept for future multi-region support)
+                        while True:
+                            line = next(f)
+                            if line[0] == '*':
+                                break
+                            if line[0] == '$':
+                                continue
+                            text = line.split()
+                            composition_list_element[int(float(text[1]))-element_base] = float(text[0])
                     if line.split()[0] == '*END':
                         break
 
         nodes = np.array(nodes)
         elements = np.array(elements, dtype=np.int64)
         element_mat = np.array(element_mat)
+        element_composition = np.array(composition_list_element)
         element_birth = np.array(birth_list_element)
         node_birth = np.array(birth_list_node,dtype=np.float64)
         asign_birth_node(elements,element_birth,node_birth)
@@ -423,6 +482,7 @@ class domain_mgr():
             e_id_sort = np.argsort(element_birth)
             elements = elements[e_id_sort]
             element_mat = element_mat[e_id_sort]
+            element_composition = element_composition[e_id_sort]
             element_birth = element_birth[e_id_sort]
         
         self.nodes = cp.asarray(nodes)
@@ -435,10 +495,13 @@ class domain_mgr():
         elements_order = [elements[i,ind[i]] for i in range(0,ind.shape[0])]
         self.elements_order = cp.array(elements_order)
         self.element_mat = element_mat
-        
+        self.element_composition = cp.asarray(element_composition)
+
         self.mat_thermal = mat_thermal
         self.thermal_TD = thermal_TD
-        
+        self.mat_graded = mat_graded
+        self.graded_TD = graded_TD
+
     def init_domain(self, verbose, timestep_override):
         # reading input files
         start = time.time()
@@ -606,6 +669,29 @@ class domain_mgr():
             dt = min_Cp*Rho/max_Cond*l**2/2.0 * self.defaultFac
             self.dt = min(self.dt,dt.item())
 
+        # graded (continuous composition) regions - one conservative dt bound per
+        # region, using each element's own blended density plus the most
+        # conservative (min Cp, max Cond) values across the two endpoint curves.
+        # Note: max_Cond correctly uses .max() here, unlike the .min() used above
+        # for legacy discrete materials - that appears to be a pre-existing
+        # under-conservative bug in the loop above (max conductivity, i.e. fastest
+        # diffusion, is the worst case for stability), left alone here since fixing
+        # it would change the computed dt for every existing multi-material file.
+        for gradID, (CpA, CondA, CpB, CondB) in self.graded_TD.items():
+            rec = next(r for r in self.mat_graded if r[0] == gradID)
+            _, rhoA, solA, liqA, latA, rhoB, solB, liqB, latB = rec
+            mat = self.element_mat == gradID
+            if mat.sum() == 0:
+                continue
+            l = ele_length[mat]
+            f = self.element_composition[mat]
+            mix = self.mixing_rules
+            density = mix['density'](rhoA, rhoB, f)
+            min_Cp = mix['cp'](CpA[:,1].min(), CpB[:,1].min(), f)
+            max_Cond = mix['cond'](CondA[:,1].max(), CondB[:,1].max(), f)
+            dt = min_Cp*density/max_Cond*l**2/2.0 * self.defaultFac
+            self.dt = min(self.dt,dt.min().item())
+
 class heat_solve_mgr():
     def __init__(self, domain):
         ##### modification needed, from files
@@ -668,8 +754,38 @@ class heat_solve_mgr():
             else:
                 self.Cond_Ip[domain.active_elements*mat] += domain.mat_thermal[i][6]
 
+        ##### graded (continuous composition) regions: blend the two endpoint
+        ##### materials' curves independently at each element's own current
+        ##### temperature, then combine via the per-property mixing rule - a
+        ##### true per-element/per-Gauss-point evaluation, not a pre-blended
+        ##### curve on a shared grid (that's what gradient_material.py's
+        ##### discrete-band approach does at preprocessing time instead).
+        mix = domain.mixing_rules
+        for gradID, (CpA, CondA, CpB, CondB) in domain.graded_TD.items():
+            rec = next(r for r in domain.mat_graded if r[0] == gradID)
+            _, rhoA, solA, liqA, latA, rhoB, solB, liqB, latB = rec
+            mat = domain.element_mat == gradID
+            active_mat = domain.active_elements*mat
+            thetaIp = temperature_ip[active_mat]
+            f = domain.element_composition[active_mat][:,cp.newaxis]   # (n_masked,1), broadcasts over the 8 Gauss points
 
-   
+            density = mix['density'](rhoA, rhoB, f)
+            solidus = mix['solidus'](solA, solB, f)
+            liquidus = mix['liquidus'](liqA, liqB, f)
+            latent = mix['latent'](latA, latB, f)/(liquidus-solidus)
+
+            self.density_Cp_Ip[active_mat] += density*latent*(thetaIp>solidus)*(thetaIp<liquidus)
+
+            CpA_ip = cp.interp(thetaIp, cp.asarray(CpA[:,0]), cp.asarray(CpA[:,1]))
+            CpB_ip = cp.interp(thetaIp, cp.asarray(CpB[:,0]), cp.asarray(CpB[:,1]))
+            self.density_Cp_Ip[active_mat] += density*mix['cp'](CpA_ip, CpB_ip, f)
+
+            CondA_ip = cp.interp(thetaIp, cp.asarray(CondA[:,0]), cp.asarray(CondA[:,1]))
+            CondB_ip = cp.interp(thetaIp, cp.asarray(CondB[:,0]), cp.asarray(CondB[:,1]))
+            self.Cond_Ip[active_mat] += mix['cond'](CondA_ip, CondB_ip, f)
+
+
+
     def update_mvec_stifness(self):
         nodes = self.domain.nodes
         elements = self.domain.elements[self.domain.active_elements]
