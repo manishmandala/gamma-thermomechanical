@@ -7,6 +7,7 @@ import time
 import numpy as np
 import sklearn.metrics as skm
 from scipy.spatial.distance import cdist
+import meshio
 
 @jit('void(int64[:,:], float64[:],float64[:])',nopython=True)
 def asign_birth_node(elements,element_birth,node_birth):
@@ -313,7 +314,34 @@ class domain_mgr():
 
                         elements.append([int(text[2])-node_base, int(text[3])-node_base, int(text[4])-node_base, int(text[5])-node_base,
                                          int(text[6])-node_base, int(text[7])-node_base, int(text[8])-node_base, int(text[9])-node_base])
-                        element_mat.append(int(text[1]))       
+                        element_mat.append(int(text[1]))
+
+                # option *EXTERNAL_MESH - loads node/element geometry from an
+                # external mesh file (VTU, or anything meshio reads) instead of
+                # hand-authored *NODE/*ELEMENT_SOLID blocks. For "analyze an
+                # already-finished static part" use: no birth curve is expected
+                # for this file, so every imported element/node defaults to
+                # birth 0.0 (active from t=0) via the *END branch below, same as
+                # any element never mentioned in a *DEFINE_CURVE table. Only
+                # linear hexahedron (HEX8) cells are supported, matching every
+                # other element type assumption already baked into this solver.
+                # All imported elements get one placeholder material (pid on the
+                # data line) - importing per-element composition data (e.g. a
+                # multi-channel "mat" field) is a separate, not-yet-built step.
+                elif line.split()[0] == '*EXTERNAL_MESH':
+                    line = next(f)
+                    text = line.split()
+                    mesh_path = os.path.join(self.input_data_dir, text[0])
+                    default_pid = int(text[1])
+                    ext_mesh = meshio.read(mesh_path)
+                    for pt in ext_mesh.points:
+                        nodes.append([float(pt[0]), float(pt[1]), float(pt[2])])
+                    hex_blocks = [b for b in ext_mesh.cells if b.type == 'hexahedron']
+                    assert hex_blocks, "*EXTERNAL_MESH: {} has no hexahedron cells - only linear HEX8 elements are supported".format(mesh_path)
+                    for block in hex_blocks:
+                        for conn in block.data:
+                            elements.append([int(v) for v in conn])
+                            element_mat.append(default_pid)
 
                 elif line.split()[0] == '*END':
                     birth_list_node = [-1 for _ in range(len(nodes))]
