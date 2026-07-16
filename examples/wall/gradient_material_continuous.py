@@ -1,6 +1,7 @@
 # Grades the DEPOSITED WALL (laser-built material) as a CONTINUOUS TI64/IN718
-# blend along X - one composition value per element (not per discrete band),
-# evaluated straight from COMPOSITION_FN at that element's own centroid x.
+# blend across the wall's x-z face (travel direction and build height) - one
+# composition value per element (not per discrete band), evaluated straight
+# from COMPOSITION_FN at that element's own centroid (x, z).
 # Properties are blended live, at runtime, by gamma.py itself (see
 # *MAT_THERMAL_GRADED_TD / *ELEMENT_COMPOSITION handling in
 # src/gamma/simulator/gamma.py) - this script only writes the composition
@@ -51,23 +52,32 @@ IN718 = dict(density=0.00819, solidus=1533, liquidus=1609, latent=270,
              cond=os.path.join(PROP_DIR, 'IN718_cond.txt'))
 
 
-# ---- composition profile: fraction of IN718 as a function of normalized x ----
-# x_norm runs 0 (TI64 end of the wall) -> 1 (IN718 end). Same presets as
-# gradient_material.py, evaluated per element instead of per band.
+# ---- composition profile: fraction of IN718 as a function of normalized
+# position ---- x_norm runs 0 (TI64 end of the wall) -> 1 (IN718 end) along
+# the build/travel direction (sideways); z_norm runs 0 -> 1 up the build
+# height (40 deposited layers, z = 0.05 .. 3.95, upwards). Every preset takes
+# both so they share one call signature - linear/step/sigmoid ignore z_norm
+# (1D profiles, identical at every layer); sinusoidal is a true 2D ripple -
+# both axes are directly visible on the wall's exterior face without needing
+# to slice through the (thin) y thickness.
 
-def linear(x_norm):
+def linear(x_norm, z_norm):
     return x_norm
 
 
-def sinusoidal(x_norm, cycles=1.5):
-    return 0.5 - 0.5 * np.cos(np.pi * cycles * x_norm)
+def sinusoidal(x_norm, z_norm, cycles_x=1.5, cycles_z=1.0):
+    # classic f(x,z)=sin(x)*sin(z) ripple surface, remapped to [0,1]: a real
+    # sine wave running sideways (x) that also changes shape as you move up
+    # the build (z) - each of the 40 layers gets a different-looking x-profile
+    # instead of an identical copy of the one below it.
+    return 0.5 - 0.5 * np.cos(np.pi * cycles_x * x_norm) * np.cos(np.pi * cycles_z * z_norm)
 
 
-def step(x_norm, n_steps=4):
+def step(x_norm, z_norm, n_steps=4):
     return np.floor(x_norm * n_steps) / (n_steps - 1)
 
 
-def sigmoid(x_norm, steepness=10, midpoint=0.5):
+def sigmoid(x_norm, z_norm, steepness=10, midpoint=0.5):
     return 1 / (1 + np.exp(-steepness * (x_norm - midpoint)))
 
 
@@ -93,7 +103,7 @@ for l in lines[node_start + 1:]:
     nodes[int(text[0])] = (float(text[1]), float(text[2]), float(text[3]))
 
 # --- read wall elements, sanity-check TARGET_PID is the above-ground wall ---
-elem_recs = []   # (eid, cx)
+elem_recs = []   # (eid, cx, cz)
 target_z = []
 for l in lines[elem_start + 1:elem_end]:
     if l.startswith('$'):
@@ -105,7 +115,7 @@ for l in lines[elem_start + 1:elem_end]:
         cx = sum(nodes[n][0] for n in node_ids) / 8.0
         cz = sum(nodes[n][2] for n in node_ids) / 8.0
         target_z.append(cz)
-        elem_recs.append((eid, cx))
+        elem_recs.append((eid, cx, cz))
 
 assert target_z and min(target_z) > -1.0, (
     "TARGET_PID={} looks like the base plate (z below ground), not the deposited "
@@ -115,11 +125,14 @@ assert GRAD_ID not in {int(lines[s+2].split()[0]) for s in mat_starts}, (
     "GRAD_ID={} collides with an existing ordinary material ID in {} - pick a different GRAD_ID".format(
         GRAD_ID, MESH_FILE_IN))
 
-# --- composition fraction per element, evaluated directly at that element's own x - no bands ---
-x_vals = [cx for _, cx in elem_recs]
+# --- composition fraction per element, evaluated directly at that element's own (x, z) - no bands ---
+x_vals = [cx for _, cx, _ in elem_recs]
+z_vals = [cz for _, _, cz in elem_recs]
 x_min, x_max = min(x_vals), max(x_vals)
-fractions = {eid: float(np.clip(COMPOSITION_FN((cx - x_min) / (x_max - x_min)), 0.0, 1.0))
-             for eid, cx in elem_recs}
+z_min, z_max = min(z_vals), max(z_vals)
+fractions = {eid: float(np.clip(COMPOSITION_FN((cx - x_min) / (x_max - x_min),
+                                                (cz - z_min) / (z_max - z_min)), 0.0, 1.0))
+             for eid, cx, cz in elem_recs}
 
 # --- rewrite element lines: base plate pid 2 -> 1, wall pid 1 -> GRAD_ID ---
 new_elem_lines = [lines[elem_start]]
@@ -187,7 +200,7 @@ lines = lines[:part_end] + new_part_lines + lines[part_end:]
 # this pass, so replacing it with *ELEMENT_COMPOSITION here is safe.
 node_start = next(i for i, l in enumerate(lines) if l.startswith('*NODE'))
 comp_lines = ['*ELEMENT_COMPOSITION\n', '%10d\n' % GRAD_ID]
-for eid, _ in elem_recs:
+for eid, _, _ in elem_recs:
     comp_lines.append('%20.8f%20d\n' % (fractions[eid], eid))
 lines = lines[:node_start] + comp_lines + lines[node_start:]
 

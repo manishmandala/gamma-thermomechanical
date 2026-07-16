@@ -53,7 +53,7 @@ Jac = cp.matmul(domain.Bip_ele,nodes_pos[:,cp.newaxis,:,:].repeat(8,axis=1))
 ele_detJac = cp.linalg.det(Jac)
 
 t = 0
-filename = 'results_graded/wall_{:04d}.vtk'.format(file_num)
+filename = 'results_graded/wall_{:04d}.vtu'.format(file_num)
 save_vtk(filename, 0.0)
 file_num = file_num + 1
 
@@ -70,7 +70,7 @@ while domain.current_sim_time < endtime - domain.dt:
     heat_solver.time_integration()
 
     if domain.current_sim_time >= next_save_time:
-        save_vtk('results_graded/wall_{:04d}.vtk'.format(file_num), float(domain.current_sim_time))
+        save_vtk('results_graded/wall_{:04d}.vtu'.format(file_num), float(domain.current_sim_time))
         file_num = file_num + 1
         next_save_time = next_save_time + save_interval
 
@@ -84,7 +84,7 @@ while domain.current_sim_time < endtime - domain.dt:
         cp.get_default_memory_pool().free_all_blocks()
 
     if domain.current_sim_time >= stop_time:
-        save_vtk('results_graded/wall_{:04d}.vtk'.format(file_num), float(domain.current_sim_time))
+        save_vtk('results_graded/wall_{:04d}.vtu'.format(file_num), float(domain.current_sim_time))
         print('\nReached {:.0f}% of the build - stopping early.'.format(100*STOP_FRACTION))
         break
 
