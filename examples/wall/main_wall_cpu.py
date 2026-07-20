@@ -1,7 +1,8 @@
 import os
-import numpy as cp
+import cupy as cp
 import numpy as np
-from scipy.sparse import csr_matrix,linalg
+import cupyx.scipy.sparse as cusparse
+import cupyx.scipy.sparse.linalg as cslinalg
 import pandas as pd
 import time
 import pyvista as pv
@@ -534,7 +535,7 @@ class domain_mgr():
         
     def generate_surf(self):
         elements = self.elements
-        nodes = self.nodes
+        nodes = self.nodes.get()   # numba(nopython) needs a plain host array, not cupy
         element_birth = self.element_birth
         
         ele_num = elements.shape[0]
@@ -868,7 +869,7 @@ def elastic_stiff_matrix(elements, nodes, shear, bulk):
     vB = ele_B.reshape(-1,n_p*3)
     jB = jB.reshape(-1,n_p*3)
     iB = cp.arange(0,jB.shape[0])[:,cp.newaxis].repeat(n_p*3,axis=1)
-    B = csr_matrix((cp.ndarray.flatten(vB),(cp.ndarray.flatten(iB), cp.ndarray.flatten(jB))), shape = (6*n_int, 3*n_n), dtype = cp.float_)
+    B = cusparse.csr_matrix((cp.ndarray.flatten(vB),(cp.ndarray.flatten(iB), cp.ndarray.flatten(jB))), shape = (6*n_int, 3*n_n), dtype = cp.float_)
 
     IOTA = cp.array([[1],[1],[1],[0],[0],[0]]) 
     VOL = cp.matmul(IOTA,IOTA.transpose()) 
@@ -880,7 +881,7 @@ def elastic_stiff_matrix(elements, nodes, shear, bulk):
     iD = temp[:,:,cp.newaxis,:].repeat(6,axis = 2)
     jD = temp[:,:,:,cp.newaxis].repeat(6,axis = 3)
 
-    D = csr_matrix((cp.ndarray.flatten(ele_D),(cp.ndarray.flatten(iD), cp.ndarray.flatten(jD))), shape = (6*n_int, 6*n_int), dtype = cp.float_)
+    D = cusparse.csr_matrix((cp.ndarray.flatten(ele_D),(cp.ndarray.flatten(iD), cp.ndarray.flatten(jD))), shape = (6*n_int, 6*n_int), dtype = cp.float_)
     ele_K =  ele_B.transpose([0,1,3,2])@ele_D@ele_B
     ele_K = ele_K.sum(axis = 1)
 
@@ -951,8 +952,8 @@ def transformation(Q_int, active_elements, ele_detJac,n_n_save):
 
     # the asssembling by using the sparse command - values v for duplicate
     # doubles i,j are automatically added together
-    F1 = csr_matrix((cp.ndarray.flatten(vF1.transpose()),(cp.ndarray.flatten(iF.transpose()), cp.ndarray.flatten(jF.transpose()))), dtype = cp.float_) 
-    F2 = csr_matrix((cp.ndarray.flatten(vF2.transpose()),(cp.ndarray.flatten(iF.transpose()), cp.ndarray.flatten(jF.transpose()))), dtype = cp.float_) 
+    F1 = cusparse.csr_matrix((cp.ndarray.flatten(vF1.transpose()),(cp.ndarray.flatten(iF.transpose()), cp.ndarray.flatten(jF.transpose()))), dtype = cp.float_) 
+    F2 = cusparse.csr_matrix((cp.ndarray.flatten(vF2.transpose()),(cp.ndarray.flatten(iF.transpose()), cp.ndarray.flatten(jF.transpose()))), dtype = cp.float_) 
 
     # Approximated values of the function Q at nodes of the FE mesh
     Q = cp.array(F1/F2)
@@ -966,16 +967,18 @@ def save_vtk(filename):
     active_elements = domain.elements[domain.active_elements].tolist()
     active_cells = np.array([item for sublist in active_elements for item in [8] + sublist])
     active_cell_type = np.array([vtk.VTK_HEXAHEDRON] * len(active_elements))
-    points = domain.nodes[0:n_n_save] + 5*U[0:n_n_save]
-    Sv =  transformation(cp.sqrt(1/2*((S[0:n_e_save,:,0]-S[0:n_e_save,:,1])**2 + (S[0:n_e_save,:,1]-S[0:n_e_save,:,2])**2 + (S[0:n_e_save,:,2]-S[0:n_e_save,:,0])**2 + 6*(S[0:n_e_save,:,3]**2+S[0:n_e_save,:,4]**2+S[0:n_e_save,:,5]**2))),domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save)
-    S11 = transformation(S[0:n_e_save,:,0], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save)
-    S22 = transformation(S[0:n_e_save,:,1], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save)
-    S33 = transformation(S[0:n_e_save,:,2], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save)
-    S12 = transformation(S[0:n_e_save,:,3], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save)
-    S23 = transformation(S[0:n_e_save,:,4], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save)
-    S13 = transformation(S[0:n_e_save,:,5], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save)
+    points = (domain.nodes[0:n_n_save] + 5*U[0:n_n_save]).get()
+    Sv =  transformation(cp.sqrt(1/2*((S[0:n_e_save,:,0]-S[0:n_e_save,:,1])**2 + (S[0:n_e_save,:,1]-S[0:n_e_save,:,2])**2 + (S[0:n_e_save,:,2]-S[0:n_e_save,:,0])**2 + 6*(S[0:n_e_save,:,3]**2+S[0:n_e_save,:,4]**2+S[0:n_e_save,:,5]**2))),domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save).get()
+    S11 = transformation(S[0:n_e_save,:,0], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save).get()
+    S22 = transformation(S[0:n_e_save,:,1], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save).get()
+    S33 = transformation(S[0:n_e_save,:,2], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save).get()
+    S12 = transformation(S[0:n_e_save,:,3], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save).get()
+    S23 = transformation(S[0:n_e_save,:,4], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save).get()
+    S13 = transformation(S[0:n_e_save,:,5], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save).get()
     active_grid = pv.UnstructuredGrid(active_cells, active_cell_type, points)
-    active_grid.point_data['temp'] = heat_solver.temperature[0:n_n_save]
+    active_grid.cell_data['material'] = domain.element_mat[domain.active_elements]
+    active_grid.cell_data['composition'] = domain.element_composition[domain.active_elements].get()
+    active_grid.point_data['temp'] = heat_solver.temperature[0:n_n_save].get()
     active_grid.point_data['S_von'] = Sv
     active_grid.point_data['S11'] = S11
     active_grid.point_data['S22'] = S22
@@ -983,9 +986,9 @@ def save_vtk(filename):
     active_grid.point_data['S12'] = S12
     active_grid.point_data['S23'] = S23
     active_grid.point_data['S13'] = S13
-    active_grid.point_data['U1'] = U[0:n_n_save,0]
-    active_grid.point_data['U2'] = U[0:n_n_save,1]
-    active_grid.point_data['U3'] = U[0:n_n_save,2]
+    active_grid.point_data['U1'] = U[0:n_n_save,0].get()
+    active_grid.point_data['U2'] = U[0:n_n_save,1].get()
+    active_grid.point_data['U3'] = U[0:n_n_save,2].get()
     active_grid.save(filename)
     
 def disp_match(nodes, U, n_n_old, n_n):
@@ -997,7 +1000,7 @@ def disp_match(nodes, U, n_n_old, n_n):
     return U1
 
 
-domain = domain_mgr(filename='thinwall.k')
+domain = domain_mgr(filename='thinwall_graded.k')
 heat_solver = heat_solve_mgr(domain)
 
 
@@ -1045,18 +1048,23 @@ Maxit = 20
 
 t = 0
 last_mech_time = 0
-output_timestep = 11
+output_timestep = 1     # save roughly once per layer (~1s/layer over the 39.1s, 40-layer build)
 
-filename = 'results_cpu/wall_{}.vtk'.format(file_num)
+# ---- run settings ----
+STOP_FRACTION = 0.1     # 0.10 = 10% preview (~4 of 40 layers). Set to 1.0 for the real full run.
+stop_time = STOP_FRACTION * endtime
+
+filename = 'results_cpu/wall_{}.vtu'.format(file_num)
 save_vtk(filename)
 file_num = file_num + 1
 
-while domain.current_time<endtime-domain.dt:
+while domain.current_time<stop_time-domain.dt:
     t = t+1
     heat_solver.time_integration()
     if t % 5000 == 0:
-        print("Current time:  {}, Percentage done:  {}%".format(domain.current_time,100*domain.current_time/domain.end_time))  
+        print("Current time:  {}, Percentage done:  {}%".format(domain.current_time,100*domain.current_time/stop_time), flush=True)
         heat_solver.time_integration()
+        cp.get_default_memory_pool().free_all_blocks()
             
     n_e_active = cp.sum(domain.element_birth < domain.current_time)
     n_n_active = cp.sum(domain.node_birth < domain.current_time) 
@@ -1102,12 +1110,12 @@ while domain.current_time<endtime-domain.dt:
 
                 S, DS, IND_p,_,_ = constitutive_problem(E[0:n_e_active], Ep_prev[0:n_e_active], Hard_prev[0:n_e_active], shear[0:n_e_active], bulk[0:n_e_active], a[0:n_e_active], Y[0:n_e_active])
                 vD = ele_detJac[:,:,cp.newaxis,cp.newaxis].repeat(6,axis=2).repeat(6,axis=3) * DS
-                D_p = csr_matrix((cp.ndarray.flatten(vD), (cp.ndarray.flatten(iD),cp.ndarray.flatten(jD))), shape = D_elast.shape, dtype = cp.float_)
+                D_p = cusparse.csr_matrix((cp.ndarray.flatten(vD), (cp.ndarray.flatten(iD),cp.ndarray.flatten(jD))), shape = D_elast.shape, dtype = cp.float_)
                 K_tangent = K_elast + B.transpose()*(D_p-D_elast)*B
                 n_plast = len(IND_p[IND_p])
                 print(' plastic integration points: ', n_plast, ' of ', IND_p.shape[0]*IND_p.shape[1])
                 F = B.transpose() @ ((ele_detJac[:,:,cp.newaxis].repeat(6,axis=2)*S).reshape(-1))
-                dU[Q],error = linalg.cg(K_tangent[Q[0:n_n_active].flatten()][:,Q[0:n_n_active].flatten()],-F[Q[0:n_n_active].flatten()],tol=tol)
+                dU[Q],error = cslinalg.cg(K_tangent[Q[0:n_n_active].flatten()][:,Q[0:n_n_active].flatten()],-F[Q[0:n_n_active].flatten()],tol=tol)
                 U_new = U_it + beta*dU[0:n_n_active,:] 
                 q1 = beta**2*dU[0:n_n_active].flatten()@K_elast@dU[0:n_n_active].flatten()
                 q2 = U_it[0:n_n_active].flatten()@K_elast@U_it[0:n_n_active].flatten()
@@ -1139,7 +1147,15 @@ while domain.current_time<endtime-domain.dt:
         n_e_old = n_e_active
         n_n_old = n_n_active
         last_mech_time = domain.current_time
+        cp.get_default_memory_pool().free_all_blocks()
+        print('Sim time {:.4f}s / {:.2f}s, active elements {}, GPU mem pool {:.2f} GB'.format(
+            domain.current_time, stop_time, n_e_active,
+            cp.get_default_memory_pool().total_bytes()/1e9), flush=True)
         if domain.current_time >= file_num*(output_timestep):
-            filename = 'results_cpu/wall_{}.vtk'.format(file_num)
+            filename = 'results_cpu/wall_{}.vtu'.format(file_num)
             save_vtk(filename)
             file_num = file_num + 1
+
+filename = 'results_cpu/wall_{}.vtu'.format(file_num)
+save_vtk(filename)
+print('\nReached {:.0f}% of the build ({:.2f}s / {:.2f}s) - stopping.'.format(100*STOP_FRACTION, domain.current_time, endtime))

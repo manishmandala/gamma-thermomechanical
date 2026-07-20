@@ -65,12 +65,18 @@ def linear(x_norm, z_norm):
     return x_norm
 
 
-def sinusoidal(x_norm, z_norm, cycles_x=1.5, cycles_z=1.0):
-    # classic f(x,z)=sin(x)*sin(z) ripple surface, remapped to [0,1]: a real
-    # sine wave running sideways (x) that also changes shape as you move up
-    # the build (z) - each of the 40 layers gets a different-looking x-profile
-    # instead of an identical copy of the one below it.
-    return 0.5 - 0.5 * np.cos(np.pi * cycles_x * x_norm) * np.cos(np.pi * cycles_z * z_norm)
+def sinusoidal(x_norm, z_norm, cycles_x=4.0, cycles_z=1.5):
+    # additive x-wave + z-wave: each axis contributes its own independent,
+    # always-present variation (a multiplicative cos(x)*cos(z) form was
+    # tried first, but a product term means the z-factor can only scale
+    # the x-wave's amplitude down - it never shows up as its own visible
+    # effect, so the wall still reads as "x-only" wherever z's factor is
+    # near 1). z gets the LOW cycle count (dominant, bottom-to-top sweep)
+    # and x the HIGH one (secondary ripple): the mesh only has 40 element-
+    # rows through z vs 70 columns along x, so a high cycle count on the
+    # coarser z axis reads as choppy/blocky under flat per-cell shading -
+    # x has plenty of resolution to carry the finer variation smoothly.
+    return 0.5 + 0.25 * np.sin(2*np.pi * cycles_x * x_norm) + 0.25 * np.sin(2*np.pi * cycles_z * z_norm)
 
 
 def step(x_norm, z_norm, n_steps=4):
