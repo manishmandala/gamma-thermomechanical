@@ -259,6 +259,13 @@ class domain_mgr():
         graded_TD = {}
         birth_list_element = []
         birth_list_node = []
+        # Only ever overwritten inside *ELEMENT_SOLID's own parsing (first
+        # data line). Files that use *EXTERNAL_MESH as their only geometry
+        # source have no *ELEMENT_SOLID block, so *DEFINE_CURVE/
+        # *ELEMENT_COMPOSITION (which index by `element_id - element_base`)
+        # would hit a NameError without this default. 1 matches meshio's
+        # 0-indexed cell append order for a 1-indexed *ELEMENT_COMPOSITION table.
+        element_base = 1
         filename = self.filename
         with open(filename) as f:
             line = next(f)
