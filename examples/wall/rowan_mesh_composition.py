@@ -83,8 +83,8 @@ $$      DT    BINARY      LCUR      IOPT      DTHF     BINHF
 mat_block = (
     '*MAT_THERMAL_GRADED_TD\n'
     '$HMNAME MATS     {}GRADED_IN718proxyIN625_1018proxySS316\n'.format(GRAD_ID) +
-    '      %5d   %.5f   %.1f   %.1f   %.1f   %.5f   %.1f   %.1f   %.1f\n' % (
-        GRAD_ID, IN718['density'], IN718['solidus'], IN718['liquidus'], IN718['latent'],
+    '      %5d   %5d   %.5f   %.1f   %.1f   %.1f   %.5f   %.1f   %.1f   %.1f\n' % (
+        GRAD_ID, 2, IN718['density'], IN718['solidus'], IN718['liquidus'], IN718['latent'],
         STEEL_1018['density'], STEEL_1018['solidus'], STEEL_1018['liquidus'], STEEL_1018['latent']) +
     IN718['cp'] + '\n' +
     IN718['cond'] + '\n' +
@@ -111,7 +111,8 @@ $	 convection
 
 comp_lines = ['*ELEMENT_COMPOSITION\n', '%10d\n' % GRAD_ID]
 for eid in range(1, n_elements + 1):
-    comp_lines.append('%20.8f%20d\n' % (frac_B[eid - 1], eid))
+    fb = frac_B[eid - 1]
+    comp_lines.append('%20.8f%20.8f%20d\n' % (1.0 - fb, fb, eid))
 
 with open(MESH_FILE_OUT, 'w') as f:
     f.write(header)

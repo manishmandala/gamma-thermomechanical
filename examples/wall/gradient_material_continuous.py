@@ -171,11 +171,13 @@ lines = lines[:mat_first_end] + lines[mat_last_end:]
 part_start = next(i for i, l in enumerate(lines) if l.startswith('*PART'))
 
 # --- new *MAT_THERMAL_GRADED_TD block, appended right after the surviving pid-1 block ---
+# N-material format: gradID, N, then 4 properties per material (N=2 here),
+# followed by one (Cp_file, Cond_file) line pair per material.
 new_mat_lines = [
     '*MAT_THERMAL_GRADED_TD\n',
     '$HMNAME MATS     {}GRADED_TI64_IN718\n'.format(GRAD_ID),
-    '      %5d   %.5f   %.1f   %.1f   %.1f   %.5f   %.1f   %.1f   %.1f\n' % (
-        GRAD_ID, TI64['density'], TI64['solidus'], TI64['liquidus'], TI64['latent'],
+    '      %5d   %5d   %.5f   %.1f   %.1f   %.1f   %.5f   %.1f   %.1f   %.1f\n' % (
+        GRAD_ID, 2, TI64['density'], TI64['solidus'], TI64['liquidus'], TI64['latent'],
         IN718['density'], IN718['solidus'], IN718['liquidus'], IN718['latent']),
     TI64['cp'] + '\n',
     TI64['cond'] + '\n',
@@ -207,7 +209,8 @@ lines = lines[:part_end] + new_part_lines + lines[part_end:]
 node_start = next(i for i, l in enumerate(lines) if l.startswith('*NODE'))
 comp_lines = ['*ELEMENT_COMPOSITION\n', '%10d\n' % GRAD_ID]
 for eid, _, _ in elem_recs:
-    comp_lines.append('%20.8f%20d\n' % (fractions[eid], eid))
+    frac_B = fractions[eid]
+    comp_lines.append('%20.8f%20.8f%20d\n' % (1.0 - frac_B, frac_B, eid))
 lines = lines[:node_start] + comp_lines + lines[node_start:]
 
 with open(MESH_FILE_OUT, 'w') as f:

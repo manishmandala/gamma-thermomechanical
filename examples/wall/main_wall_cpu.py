@@ -191,8 +191,10 @@ def derivate_shape_fnc_element(parCoord):
                                 onePlusChsi * onePlusEta, oneMinusChsi * onePlusEta]])
     return B
 
-def linear_mix(a, b, f):
-    return (1 - f) * a + f * b
+def linear_mix(values, f):
+    # values: list of N per-material terms; f's last axis is always the
+    # N-materials axis. Mirrors gamma.py's linear_mix.
+    return sum(f[..., k] * values[k] for k in range(len(values)))
 
 
 # Default per-property blend rule for *MAT_THERMAL_GRADED_TD regions - mirrors
@@ -320,7 +322,8 @@ class domain_mgr():
                 elif line.split()[0] == '*END':
                     birth_list_node = [-1 for _ in range(len(nodes))]
                     birth_list_element = [0.0]*len(elements)
-                    composition_list_element = [0.0]*len(elements)
+                    n_mat_graded = len(mat_graded[0][1]) if mat_graded else 1
+                    composition_list_element = [[0.0]*n_mat_graded for _ in range(len(elements))]
                     break
 
                 elif line.split()[0] == '*TOOL_FILE':
@@ -402,27 +405,29 @@ class domain_mgr():
                     cond = np.loadtxt(line.split()[0])
                     thermal_TD[int(text1[0])] = [Cp,cond]
 
-                # option *MAT_THERMAL_GRADED_TD - continuous blend between two
-                # endpoint materials (A, B), mirrors gamma.py: a graded region
-                # never registers in mat_thermal/thermal_TD, so it can't trip
-                # get_timestep's matID == file-position+1 assumption.
+                # option *MAT_THERMAL_GRADED_TD - continuous blend between N
+                # endpoint materials, mirrors gamma.py: a graded region never
+                # registers in mat_thermal/thermal_TD, so it can't trip
+                # get_timestep's matID == file-position+1 assumption. Data
+                # line: gradID, N, then 4 properties per material. Followed by
+                # N (Cp_file, Cond_file) line pairs, one per material.
                 elif line.split()[0] == '*MAT_THERMAL_GRADED_TD':
                     line = next(f)
                     line = next(f)
                     text1 = line.split()
                     gradID = int(text1[0])
-                    mat_graded.append([gradID,
-                                        float(text1[1]), float(text1[2]), float(text1[3]), float(text1[4]),  # A: density, solidus, liquidus, latent
-                                        float(text1[5]), float(text1[6]), float(text1[7]), float(text1[8])])  # B: density, solidus, liquidus, latent
-                    line = next(f)
-                    CpA = np.loadtxt(os.path.join(self.input_data_dir, line.split()[0]))
-                    line = next(f)
-                    CondA = np.loadtxt(os.path.join(self.input_data_dir, line.split()[0]))
-                    line = next(f)
-                    CpB = np.loadtxt(os.path.join(self.input_data_dir, line.split()[0]))
-                    line = next(f)
-                    CondB = np.loadtxt(os.path.join(self.input_data_dir, line.split()[0]))
-                    graded_TD[gradID] = [CpA, CondA, CpB, CondB]
+                    n_mat = int(text1[1])
+                    props = text1[2:]
+                    mat_props = [tuple(float(v) for v in props[4*k:4*k+4]) for k in range(n_mat)]
+                    mat_graded.append([gradID, mat_props])
+                    curves = []
+                    for k in range(n_mat):
+                        line = next(f)
+                        Cp_k = np.loadtxt(os.path.join(self.input_data_dir, line.split()[0]))
+                        line = next(f)
+                        Cond_k = np.loadtxt(os.path.join(self.input_data_dir, line.split()[0]))
+                        curves.append((Cp_k, Cond_k))
+                    graded_TD[gradID] = curves
 
                 else:
                     line = next(f)
@@ -451,7 +456,9 @@ class domain_mgr():
                             if line[0] == '$':
                                 continue
                             text = line.split()
-                            composition_list_element[int(float(text[1]))-element_base] = float(text[0])
+                            eid = int(float(text[-1]))   # last column is always the element id
+                            fracs = [float(v) for v in text[:-1]]   # one fraction per material, N columns
+                            composition_list_element[eid-element_base] = fracs
                     if line.split()[0] == '*END':
                         break
 
@@ -657,18 +664,21 @@ class domain_mgr():
         # graded (continuous composition) regions - one conservative dt bound per
         # region, using each element's own blended density plus the most
         # conservative (min Cp, max Cond) values across the two endpoint curves.
-        for gradID, (CpA, CondA, CpB, CondB) in self.graded_TD.items():
+        for gradID, curves in self.graded_TD.items():
             rec = next(r for r in self.mat_graded if r[0] == gradID)
-            _, rhoA, solA, liqA, latA, rhoB, solB, liqB, latB = rec
+            _, mat_props = rec
+            rhos = [p[0] for p in mat_props]
             mat = self.element_mat == gradID
             if mat.sum() == 0:
                 continue
             l = ele_length[mat]
-            f = self.element_composition[mat]
+            f = self.element_composition[mat]   # (n_masked, N)
             mix = self.mixing_rules
-            density = mix['density'](rhoA, rhoB, f)
-            min_Cp = mix['cp'](CpA[:,1].min(), CpB[:,1].min(), f)
-            max_Cond = mix['cond'](CondA[:,1].max(), CondB[:,1].max(), f)
+            min_cps = [Cp_k[:,1].min() for Cp_k, Cond_k in curves]
+            max_conds = [Cond_k[:,1].max() for Cp_k, Cond_k in curves]
+            density = mix['density'](rhos, f)
+            min_Cp = mix['cp'](min_cps, f)
+            max_Cond = mix['cond'](max_conds, f)
             dt = min_Cp*density/max_Cond*l**2/2.0 * self.defaultFac
             self.dt = min(self.dt,dt.min().item())
 
@@ -734,32 +744,38 @@ class heat_solve_mgr():
             else:
                 self.Cond_Ip[domain.active_elements*mat] += domain.mat_thermal[i][6]
 
-        ##### graded (continuous composition) regions: blend the two endpoint
+        ##### graded (continuous composition) regions: blend the N endpoint
         ##### materials' curves independently at each element's own current
         ##### temperature, then combine via the per-property mixing rule.
         mix = domain.mixing_rules
-        for gradID, (CpA, CondA, CpB, CondB) in domain.graded_TD.items():
+        for gradID, curves in domain.graded_TD.items():
             rec = next(r for r in domain.mat_graded if r[0] == gradID)
-            _, rhoA, solA, liqA, latA, rhoB, solB, liqB, latB = rec
+            _, mat_props = rec
+            rhos  = [p[0] for p in mat_props]
+            sols  = [p[1] for p in mat_props]
+            liqs  = [p[2] for p in mat_props]
+            lats  = [p[3] for p in mat_props]
             mat = domain.element_mat == gradID
             active_mat = domain.active_elements*mat
             thetaIp = temperature_ip[active_mat]
-            f = domain.element_composition[active_mat][:,cp.newaxis]   # (n_masked,1), broadcasts over the 8 Gauss points
+            f = domain.element_composition[active_mat]
+            # (n_masked,1,N): every mix() call below uses this same shape, so
+            # each result comes out (n_masked,1) - matching thetaIp's
+            # (n_masked,8) via broadcast, same as the old single-fraction f.
+            f_ip = f[:,cp.newaxis,:]
 
-            density = mix['density'](rhoA, rhoB, f)
-            solidus = mix['solidus'](solA, solB, f)
-            liquidus = mix['liquidus'](liqA, liqB, f)
-            latent = mix['latent'](latA, latB, f)/(liquidus-solidus)
+            density = mix['density'](rhos, f_ip)
+            solidus = mix['solidus'](sols, f_ip)
+            liquidus = mix['liquidus'](liqs, f_ip)
+            latent = mix['latent'](lats, f_ip)/(liquidus-solidus)
 
             self.density_Cp_Ip[active_mat] += density*latent*(thetaIp>solidus)*(thetaIp<liquidus)
 
-            CpA_ip = cp.interp(thetaIp, cp.asarray(CpA[:,0]), cp.asarray(CpA[:,1]))
-            CpB_ip = cp.interp(thetaIp, cp.asarray(CpB[:,0]), cp.asarray(CpB[:,1]))
-            self.density_Cp_Ip[active_mat] += density*mix['cp'](CpA_ip, CpB_ip, f)
+            Cp_ip_k = [cp.interp(thetaIp, cp.asarray(Cp_k[:,0]), cp.asarray(Cp_k[:,1])) for Cp_k, Cond_k in curves]
+            self.density_Cp_Ip[active_mat] += density*mix['cp'](Cp_ip_k, f_ip)
 
-            CondA_ip = cp.interp(thetaIp, cp.asarray(CondA[:,0]), cp.asarray(CondA[:,1]))
-            CondB_ip = cp.interp(thetaIp, cp.asarray(CondB[:,0]), cp.asarray(CondB[:,1]))
-            self.Cond_Ip[active_mat] += mix['cond'](CondA_ip, CondB_ip, f)
+            Cond_ip_k = [cp.interp(thetaIp, cp.asarray(Cond_k[:,0]), cp.asarray(Cond_k[:,1])) for Cp_k, Cond_k in curves]
+            self.Cond_Ip[active_mat] += mix['cond'](Cond_ip_k, f_ip)
 
     def update_mvec_stifness(self):
         nodes = self.domain.nodes
