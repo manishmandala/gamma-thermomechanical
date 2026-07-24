@@ -649,12 +649,13 @@ class domain_mgr():
             if sum(self.element_mat==self.mat_thermal[i][0]) == 0:
                 continue
             l = ele_length[self.element_mat==self.mat_thermal[i][0]].min()
+            matID = self.mat_thermal[i][0]
             if self.mat_thermal[i][5] == -1:
-                min_Cp = self.thermal_TD[i+1][0][:,1].min()
+                min_Cp = self.thermal_TD[matID][0][:,1].min()
             else:
                 min_Cp = self.mat_thermal[i][5]
             if self.mat_thermal[i][6] == -1:
-                max_Cond = self.thermal_TD[i+1][1][:,1].min()
+                max_Cond = self.thermal_TD[matID][1][:,1].max()
             else:
                 max_Cond = self.mat_thermal[i][6]
             Rho = self.mat_thermal[i][1]
