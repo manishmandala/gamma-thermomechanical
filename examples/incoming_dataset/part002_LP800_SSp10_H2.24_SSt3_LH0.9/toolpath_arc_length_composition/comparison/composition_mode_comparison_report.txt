@@ -1,0 +1,24 @@
+Composition-mode thermal comparison: toolpath_arc_length vs global_x (both sinusoidal, part002)
+======================================================================
+matched frames: 21
+
+Whole-field temperature difference (all matched frames):
+  max absolute difference:  34.1892 K  (at t=10.00083)
+  mean absolute difference: 0.0009 K
+
+Peak temperature history:
+  arc_length: min=300.00 max=3010.04 K (final=3010.04 K)
+  global_x:   min=300.00 max=3017.88 K (final=3017.88 K)
+  max peak-history difference: 7.8415 K
+
+Hottest-node location over time (first, middle, last matched frame):
+  t=0.000s  arc_length hottest: xyz=(-20.95,-12.10,0.00) T=300.0K   global_x hottest: xyz=(-20.95,-12.10,0.00) T=300.0K
+  t=5.002s  arc_length hottest: xyz=(-24.79,-7.52,0.00) T=814.6K   global_x hottest: xyz=(-24.79,-7.52,0.00) T=814.6K
+  t=10.001s  arc_length hottest: xyz=(-19.97,9.93,0.80) T=3010.0K   global_x hottest: xyz=(-19.97,9.93,0.80) T=3017.9K
+
+Final-frame (t=10.001s) temperature difference distribution:
+  max=34.1892  mean=0.0194  median=0.0000  std=0.5450 K
+  fraction of nodes with diff > 1K:  0.24%
+  fraction of nodes with diff > 10K: 0.05%
+
+Visibly different thermal pattern? YES (max whole-field diff 34.19K)
