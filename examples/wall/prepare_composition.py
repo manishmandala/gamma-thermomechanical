@@ -34,6 +34,7 @@ import os
 import cupy as cp
 cp.cuda.Device(0).use()
 from gamma.simulator.gamma import domain_mgr
+from composition_lib import composition_function
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--dataset', required=True, help='dataset folder, e.g. ../incoming_dataset/part002_.../')
@@ -115,7 +116,12 @@ if args.mode in ('pure_inconel', 'pure_titanium'):
     lines = lines[:build_start] + new_block + lines[build_end:]
 
 else:  # constant_inconel / constant_titanium
-    frac = (1.0, 0.0) if args.mode == 'constant_inconel' else (0.0, 1.0)
+    # routed through composition_lib's shared engine (mode='constant' ignores
+    # its coordinate inputs entirely) rather than a hardcoded tuple, so this
+    # script and the position-dependent generators (gradient_material_continuous*.py)
+    # share one composition-evaluation code path.
+    frac_TI64 = composition_function(0.0, 0.0, 'constant', value=(0.0 if args.mode == 'constant_inconel' else 1.0))
+    frac = (1.0 - frac_TI64, frac_TI64)
     new_mat_block = [
         '*MAT_THERMAL_GRADED_TD\n',
         '$HMNAME MATS     {}GRADED_CONSTANT\n'.format(build_pid),
