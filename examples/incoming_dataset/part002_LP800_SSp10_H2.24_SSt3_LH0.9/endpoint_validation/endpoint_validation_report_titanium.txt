@@ -1,0 +1,10 @@
+Endpoint validation: Titanium endpoint (composition=[0,1])
+  pure run:     ../incoming_dataset/part002_LP800_SSp10_H2.24_SSt3_LH0.9/endpoint_validation/results_pure_titanium
+  constant run: ../incoming_dataset/part002_LP800_SSp10_H2.24_SSt3_LH0.9/endpoint_validation/results_constant_titanium
+  matched frames: 21 (by TIME field)
+  max absolute temperature difference:  4.547474e-13 K  (at t=10.00083)
+  mean absolute temperature difference: 1.380926e-15 K
+  max peak-temperature-history difference:  4.547474e-13 K
+  mean peak-temperature-history difference: 3.248195e-14 K
+  tolerance: 1.0e-03 K
+  RESULT: PASS

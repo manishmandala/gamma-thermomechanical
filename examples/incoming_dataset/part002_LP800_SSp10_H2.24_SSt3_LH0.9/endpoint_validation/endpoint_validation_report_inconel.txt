@@ -1,0 +1,10 @@
+Endpoint validation: Inconel endpoint (composition=[1,0])
+  pure run:     ../incoming_dataset/part002_LP800_SSp10_H2.24_SSt3_LH0.9/endpoint_validation/results_pure_inconel
+  constant run: ../incoming_dataset/part002_LP800_SSp10_H2.24_SSt3_LH0.9/endpoint_validation/results_constant_inconel
+  matched frames: 21 (by TIME field)
+  max absolute temperature difference:  2.273737e-13 K  (at t=10.00083)
+  mean absolute temperature difference: 1.325909e-15 K
+  max peak-temperature-history difference:  1.136868e-13 K
+  mean peak-temperature-history difference: 2.165464e-14 K
+  tolerance: 1.0e-03 K
+  RESULT: PASS
