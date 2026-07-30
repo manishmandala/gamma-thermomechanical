@@ -1,0 +1,17 @@
+import meshio
+
+data = meshio.read("sol_100.vtu")
+
+print(data)
+
+# nodal coordinates
+print(data.points.shape)
+# print(data.points)
+
+# element connectivity
+print(data.cells[0].data.shape)
+# print(data.cells[0].data)
+
+# material information
+print(data.cell_data["mat"][0].shape)
+# print(data.cell_data["mat"][0])
