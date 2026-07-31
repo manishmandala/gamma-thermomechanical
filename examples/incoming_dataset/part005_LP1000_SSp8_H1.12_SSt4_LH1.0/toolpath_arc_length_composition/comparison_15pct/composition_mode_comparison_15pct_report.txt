@@ -1,0 +1,43 @@
+15%-depth composition-mode thermal comparison: toolpath_arc_length vs global_x (part005)
+======================================================================
+matched frames: 41
+
+Temperature difference over time (all matched frames):
+  max:    min=0.0000  max=519.1801  (at t=82.502)
+  mean:   min=0.0000  max=1.0584
+  median: min=0.0000  max=0.4296
+  std:    min=0.0000  max=6.8622
+
+Peak temperature history:
+  arc_length: max=4859.79K (final=4859.79K)
+  global_x:   max=4853.66K (final=4853.66K)
+  max peak-history difference: 164.9909K
+
+Mean active-build-region temperature (final valid frame):
+  arc_length: 742.62K   global_x: 742.88K
+  fraction of frames with active build region: 98%
+
+Hottest-node location (first, 25%, 50%, 75%, last matched frame):
+  t=0.000s  arc_length: xyz=(5.58,3.74,0.00) T=300.0K   global_x: xyz=(5.58,3.74,0.00) T=300.0K
+  t=37.503s  arc_length: xyz=(5.58,6.58,1.00) T=4123.2K   global_x: xyz=(5.58,6.58,1.00) T=4171.7K
+  t=75.001s  arc_length: xyz=(-5.99,23.25,1.00) T=3826.4K   global_x: xyz=(-5.99,23.25,1.00) T=3827.1K
+  t=112.503s  arc_length: xyz=(0.12,-4.04,2.00) T=4475.1K   global_x: xyz=(0.12,-4.04,2.00) T=4381.9K
+  t=150.001s  arc_length: xyz=(-11.42,13.58,2.00) T=4859.8K   global_x: xyz=(-11.42,13.58,2.00) T=4853.7K
+
+Final-frame (t=150.001s) difference thresholds:
+  max=78.0726  mean=0.8262  median=0.2095  std=2.5506 K
+  nodes > 1K: 2545 (19.934%)
+  nodes > 10K: 127 (0.995%)
+  nodes > 25K: 26 (0.204%)
+
+Largest-difference node locations relative to melt pool (final frame, top 50 worst nodes):
+  median distance to hottest (melt-pool) node: 2.640 units
+  min/max distance to melt pool: 0.870 / 4.372
+
+Repeated-pass seam cross-check:
+  0 seam elements identified (s-jump-to-neighbor > 0.15)
+  of the 50 highest final-frame-difference nodes:
+    within 1.0 units of a seam element: 0 (0%)
+    median distance to nearest seam element: inf units
+    median distance to melt pool (hottest node): 2.640 units
+  seam artifact creates misleading thermal differences? NO - largest differences are NOT primarily at seam elements (likely melt-pool-driven instead)
