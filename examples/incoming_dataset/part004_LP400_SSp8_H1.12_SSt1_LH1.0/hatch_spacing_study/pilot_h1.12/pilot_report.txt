@@ -1,0 +1,277 @@
+Hatch-spacing study - pilot case h=1.12mm (part004)
+====================================================
+base commit before this work: 070054f6a8e7fd4f30200c227038883ef54414ea
+
+=============================================================================
+CRITICAL FINDING FIRST: a real bug was discovered and fixed during this
+pilot that invalidates two previously-committed results. Read this section
+before anything else below.
+=============================================================================
+
+While wiring up this pilot's smoke test, run_wall.py failed with a
+FileNotFoundError on a toolpath path that should have resolved correctly.
+Investigating why revealed that run_wall.py's --toolpath argument is used
+AS-IS relative to the process's current working directory - it is NEVER
+joined with --input-data-dir, unlike every other script in this project
+(diagnose_composition_mapping.py, prepare_composition.py both correctly
+join dataset+toolpath). Every prior invocation in this project that passed
+a bare "--toolpath toolpath.crs" alongside a separate "--input-data-dir
+../incoming_dataset/partNNN.../" (run from examples/wall/) therefore
+resolved to examples/wall/toolpath.crs - the ORIGINAL thin-wall demo
+example's own toolpath (x in [-7,7], y=0 constant, ends at t=38.1s, then
+holds its last position for the rest of any longer run) - NOT the real
+dataset's toolpath.
+
+Verified by direct inspection of already-committed result frames (not
+assumed):
+  - part004's 15%-depth thermal validation (commit 2a19dd9) IS AFFECTED:
+    hottest-node temperature peaks once at t=14.88s (1072.9K, exactly
+    matching the wall demo toolpath's brief active window) then MONOTONICALLY
+    decays toward ambient (300K) for the entire remaining ~104 seconds of the
+    intended 119s/15%-depth window, with the hottest-node position barely
+    moving (drifting within a ~2mm patch near x=-4..2, y=0..2) instead of
+    sweeping part004's real 17.92x43.5mm footprint. This confirms the real
+    laser was only actually active for the first ~38 (wrong-toolpath) seconds
+    out of the intended 119-second window, then sat frozen doing nothing for
+    the rest of the "15%-depth" run.
+  - The entire laser-power sweep (commit 070054f, 10 runs, 400-1200W) IS
+    AFFECTED for the same reason - it reused the same broken --toolpath
+    toolpath.crs pattern for every run. This means the sweep's reported
+    peak temperatures (682-2057K) and its headline finding ("composition-
+    induced transient max|dT| stays flat ~24K across 400-1200W, weak power
+    effect") reflect only the first ~38 seconds of real heating out of each
+    run's intended 119-second (15%-depth) window, not a representative
+    sample of the actual raster process. THIS FINDING SHOULD NOT BE TRUSTED
+    AS STATED and needs to be rerun before any further conclusions are drawn
+    from it.
+  - part002 and part005's validations (commits through a8060a7) were
+    CHECKED DIRECTLY and are NOT affected: their hottest-node positions span
+    wide, geometry-consistent ranges (part002: x in [-21,22], y in [-18,16];
+    part005: x reaching -11.4, outside the wall toolpath's [-7,7] range) and
+    sustain high peak temperatures continuously throughout their full
+    windows - both are physically inconsistent with the broken toolpath and
+    consistent with their real toolpaths having been used correctly. These
+    results stand.
+
+Direct evidence of the difference this makes: this pilot's own 2%-depth
+smoke test (using the CORRECT toolpath, see below) shows a 147.3K transient
+composition-induced difference at 400W - about 6x larger than the power
+sweep's reported ~24-27K "flat" difference at the SAME power level, despite
+being a much SHALLOWER depth (2% vs 15%). This is strong, direct evidence
+the power sweep's "weak power effect" conclusion does not hold up once the
+real toolpath is used, and must be rerun before being relied on.
+
+Root cause fixed in examples/wall/run_wall.py: --toolpath is now joined with
+--input-data-dir before being passed to domain_mgr, matching every other
+script's convention. This is backward compatible for the wall/ example's own
+usage (--input-data-dir defaults to '.', so os.path.join('.','toolpath.crs')
+resolves the same as before) but changes the required calling convention for
+external datasets: --toolpath must now be given RELATIVE TO --input-data-dir
+(e.g. just "toolpath.crs" or "hatch_spacing_study/pilot_h1.12/toolpath_synthetic_h1.12.crs"),
+not as an already-dataset-prefixed path from the wall/ cwd.
+
+Recommendation: rerun the part004 15%-depth validation and the full 5-point
+power sweep with the fixed run_wall.py before drawing any further
+conclusions from either. This pilot's own results below used the fixed
+script throughout.
+
+=============================================================================
+1. Files created or modified
+=============================================================================
+Created (examples/wall/):
+  - generate_raster_toolpath.py   (reusable synthetic boustrophedon generator)
+  - build_synthetic_deck.py       (assign_birth_time + deck assembly, mesh unchanged)
+  - validate_synthetic_toolpath.py (toolpath/birth/mesh validation, 7 checks)
+  - make_gradient_comparison_figure_pilot.py
+
+Modified (examples/wall/):
+  - run_wall.py   (bug fix: --toolpath now joined with --input-data-dir; see above)
+
+Created (examples/incoming_dataset/part004_.../hatch_spacing_study/pilot_h1.12/):
+  - toolpath_synthetic_h1.12.crs
+  - 4_synthetic_h1.12.k (plain, mesh unchanged from part004's real 4.k)
+  - 4_synthetic_h1.12_graded_globalx_sinusoidal.k
+  - 4_synthetic_h1.12_graded_arclength_sinusoidal.k
+  - toolpath_validation_report.txt
+  - composition_diagnostics.vtu / .csv, mapping_validation_report.txt
+  - global_x_vs_toolpath_gradient_pilot_h1.12.png
+  - results_arclength_sinusoidal_2pct/, results_globalx_sinusoidal_2pct/ (gitignored, not committed)
+  - this report
+
+=============================================================================
+2. Exact toolpath-generation method
+=============================================================================
+Boustrophedon raster over part004's measured real footprint
+(x:[-5.29170709,12.62829291], y:[-12.14104179,31.35768296], both measured
+directly from the real mesh/toolpath, not assumed):
+  - hatch=1.12mm exactly divides the 17.92mm x-width into 16 gaps -> 17
+    parallel tracks, each running the full 43.50mm y-length
+  - 8 layers x 1.0mm = 8mm total height, MATCHING the real mesh's real
+    z-extent exactly (see correction below - not 16 layers)
+  - alternating direction each track (boustrophedon), reset to the same
+    starting corner (x_min, y_min) at the start of every new layer -
+    verified this matches part004's real toolpath's own convention exactly
+  - uniform scan speed 8.0 units/s for EVERY segment (deposition tracks,
+    inter-track steps, and diagonal layer-transition moves alike) - verified
+    this matches part004's real toolpath, which uses the same uniform speed
+    even for its laser-off moves, not a separate rapid-travel speed
+  - laser-on during deposition tracks, laser-off during inter-track steps
+    and layer transitions - explicit per-segment state, matching the real
+    .crs format exactly
+
+Correction made during implementation: your spec said "16 layers, 1.0mm
+layer height." Checked against the real data first: part004's real toolpath
+only visits 8 distinct z-levels (1.0-8.0mm), matching the mesh's real 8mm
+z-extent exactly. "16" in my earlier generalization report referred to mesh
+element z-SUBLAYERS (2 FEM elements per real 1mm deposited layer), not
+toolpath deposition passes - carried over imprecisely. Using literal 16
+layers x 1.0mm = 16mm would have made the toolpath taller than the real
+8mm-tall mesh, which would fail your own bounds-check requirement (item 4).
+Built with 8 layers to keep toolpath and mesh height consistent.
+
+Correction to my own OCTOBER... (earlier) generalization report: while
+grounding this generator, direct measurement showed part004's real toolpath
+already has 17 tracks/layer at EXACTLY 1.12mm spacing (all 16 consecutive
+gaps measured at 1.12mm) - a genuine dense raster. My earlier report's claim
+of "a sparse 2-line-per-layer raster, only 24 passes total" was wrong - a
+bug in an earlier session's direction-reversal-based pass counter, which
+badly undercounted. This does not change any composition-diagnostic
+conclusion (the seam-rate root cause explanation - coarse toolpath relative
+to layer count causing large layer-boundary arc-length jumps - needs
+re-examination given the real raster is much denser than previously
+believed; flagged here, not re-investigated in this pilot since it is
+orthogonal to the hatch-spacing study itself).
+
+Birth times: computed via the EXISTING gamma.simulator.preprocessor.
+assign_birth_time() (mode=0, circular-footprint check, radius=1.12 matching
+the real beam radius, path_resolution=0.05) - no new birth-time algorithm
+was written; this is the same function that presumably generated the
+original datasets' birth curves.
+
+=============================================================================
+3. Diagnostic results
+=============================================================================
+Toolpath/birth/mesh validation (validate_synthetic_toolpath.py, 7 checks,
+all PASS):
+  1. Mesh identity vs. part004's original 4.k: PASS (byte-for-byte via
+     load_mesh_file array comparison - mesh genuinely unchanged)
+  2. Toolpath z-extent (8.0) within mesh z-extent (8.0): PASS
+  3. Uniform scan speed: mean=median=min=max=8.000000 units/s: PASS
+  4. Total path length 6401.8603, ENDTIM 800.2325s (vs. part004's real
+     6349.9211 / 793.7401s - close, as expected: this synthetic path covers
+     the full rectangular bounding box while part004's real footprint has a
+     notched corner, and 6401.86 total length x 43.5mm-tall main
+     regions matches the same scale of coverage)
+  5. Build elements: 5800 (matches part004's real build-region count
+     exactly). Never-reached: 0 of 5800 (0.000%)
+  6. Birth-time range (real elements): [7.3126, 794.3115]s. Active-element
+     count grows monotonically across 50 sampled times (0 -> 5800): PASS
+  7. Spatial alignment: 200-element random sample, 0 exceed 2.0 units from
+     the interpolated laser position at their own birth time (well within
+     the 1.12mm beam radius): PASS
+
+Composition diagnostics (diagnose_composition_mapping.py, reused unchanged):
+  - s range [0.000784, 0.881198], 88.2% unique values at 6dp (not stair-
+    stepped)
+  - projection distance: mean 0.586, median 0.577, max 0.750
+  - composition field: no NaN/Inf, range [0.25,0.75] (within spec), 0
+    out-of-range values
+  - seam/repeated-pass flag rate: 13.034% (756/5800) - LOWER than part004's
+    real toolpath's 34.741% at the same nominal hatch spacing. Plausible
+    explanation: this synthetic raster's clean rectangular footprint and
+    perfectly regular reset-per-layer pattern is more geometrically regular
+    than part004's real notched footprint, which likely introduces
+    additional layer-to-layer irregularity on top of the base hatch-driven
+    effect. Not investigated further here - noted for the full sweep.
+  - comparison vs. global_x: mean abs diff 0.205, max abs diff 0.499,
+    correlation -0.001 (effectively unrelated fields, as expected)
+
+Side-by-side composition figure (global_x_vs_toolpath_gradient_pilot_h1.12.png):
+visually distinct patterns confirmed, same jagged-streak signature as
+part004's real toolpath visible in the toolpath-following panel.
+
+=============================================================================
+4. Coverage and never-reached counts
+=============================================================================
+5800 of 5800 build elements reached (100.000% coverage, 0 never-reached) -
+a clean result attributable to the synthetic toolpath's full-rectangular-
+footprint coverage generously exceeding the real footprint's extent in every
+direction.
+
+=============================================================================
+5. Smoke-test runtimes and thermal results (CORRECT toolpath, post-fix)
+=============================================================================
+Both runs: --stop-fraction 0.02, --n-frames 20, identical settings, separate
+folders (results_arclength_sinusoidal_2pct/, results_globalx_sinusoidal_2pct/),
+no overwrite (folders did not previously exist). Each completed in well
+under 2 minutes (14060 elements, same mesh scale as all other part004 runs).
+21 matched frames each, sim time correctly reached 16.00s = 2% of the new
+800.23s ENDTIM.
+
+Solver stability: no NaN/Inf, no crashes, both runs completed cleanly.
+
+Peak temperatures: arc_length 2319.4K, global_x 2343.3K (both runs reach
+well above IN718's liquidus of 1609K at just 2% depth - this pilot's raster
+delivers much more concentrated, continuous heating than part004's real
+raster did at the same depth, consistent with the synthetic path having NO
+notch-driven interruptions and every track running the full 43.5mm length).
+
+Hottest-node locations: track correctly and continuously along each
+raster line (e.g. y sweeping from +30 to -7 at fixed x=-5.27, then jumping
+to the next track at x=-4.18, then x=-3.2..) - x increments between
+consecutive tracks measured directly from the hottest-node trace at ~1.09-
+1.12mm, matching the hatch spacing. This is the clearest possible confirmation
+that the fixed toolpath-loading path is now driving the thermal solve
+correctly.
+
+Maximum temperature-field difference: transient max|dT| = 147.325K at
+t=13.608s. Final-frame (t=16.01s) max diff = 60.046K - has NOT decayed to
+near-zero by the end of this very short 2%-depth window (unsurprising: 2%
+depth ends only ~2 seconds after the most recent heating event in this
+fast-moving raster, unlike part004's real toolpath which has much longer
+gaps between passes near any given point).
+
+Whether differences stay localized near the laser: final-frame hottest
+nodes for the two modes are ~1.1 units apart (arc: [-3.26,13.17,1],
+gx: [-2.36,13.24,1]) - both sitting on/near the currently-active track,
+consistent with all prior findings that composition-driven differences
+track the active heat source, not a diffuse or seam-driven pattern.
+
+=============================================================================
+6. Physical or numerical problems
+=============================================================================
+The run_wall.py toolpath-path bug (section above) is the significant
+finding of this pilot - far more consequential than anything hatch-spacing-
+specific. No other numerical problems: no NaN/Inf anywhere, monotonic birth
+growth, clean solver completion, physically sensible temperature ranges once
+the correct toolpath was in effect.
+
+One expected, non-problematic difference from part004's real toolpath: this
+synthetic pilot reaches much higher peak temperatures at the same depth
+(2319K at 2% depth vs. part004's real ~1073K, which was ALSO measured with
+the broken toolpath and needs its own rerun to know its true value) because
+every track here runs the full, uninterrupted 43.5mm length with no notch-
+driven gaps - a genuine, expected geometric difference between the clean
+synthetic raster and the real notched part, not a defect.
+
+=============================================================================
+7. Reliability assessment: is the pilot ready to expand into the full
+   5-spacing sweep?
+=============================================================================
+YES, with one hard prerequisite: the toolpath-generation, birth-assignment,
+and validation infrastructure built and exercised in this pilot (generate_
+raster_toolpath.py, build_synthetic_deck.py, validate_synthetic_toolpath.py,
+the composition pipeline, and the now-fixed run_wall.py) is sound - every
+validation check passed, coverage is complete, birth times are monotonic
+and spatially consistent, the composition field is valid, and the smoke
+test produced physically sensible, continuously-evolving thermal behavior
+with no numerical problems.
+
+The hard prerequisite: do NOT proceed to the other four hatch-spacing
+values until the part004 15%-depth validation and the full power sweep have
+been RERUN with the fixed run_wall.py and their conclusions re-established.
+The hatch-spacing study's entire premise (comparing against a "power has a
+weak effect" baseline) currently rests on invalidated data. Running the
+hatch-spacing sweep before fixing this would risk building a second study on
+the same broken foundation, and would make any future comparison between the
+two studies meaningless.

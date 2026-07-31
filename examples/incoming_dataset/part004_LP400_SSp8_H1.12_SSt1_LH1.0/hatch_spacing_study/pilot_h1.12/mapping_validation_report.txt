@@ -1,0 +1,31 @@
+
+part004_LP400_SSp8_H1.12_SSt1_LH1.0 toolpath_arc_length mapping - validation statistics
+============================================================
+build elements: 5800
+toolpath: 273 waypoints, 272 segments, total length 6401.8603
+
+s (normalized path coordinate):
+  min=0.000784  max=0.881198
+  elements with s < 0.05: 491 (8.47%)
+  elements with s > 0.95: 0 (0.00%)
+
+nearest-projection distance (element centroid to toolpath):
+  mean=0.5858  median=0.5770  max=0.7503
+
+unique s values: 5118 of 5800 elements at 6dp (88.2% unique), 772 at 3dp
+
+segment assignment: 113 of 272 segments used by at least one element
+
+composition field validity:
+  any NaN? False  any inf? False
+  range: [0.250000, 0.750000] (must be within [0,1])
+  out-of-[0,1] values: 0
+
+seam / repeated-pass / large-neighbor-jump inspection (threshold=0.15):
+  flagged elements: 756 of 5800 (13.034%)
+  z range of flagged elements: [1.500, 7.500]
+  best_segment range of flagged elements: [3, 238]
+
+comparison vs. global_x composition field:
+  mean abs difference: 0.205492  max abs difference: 0.499218
+  correlation: -0.0013

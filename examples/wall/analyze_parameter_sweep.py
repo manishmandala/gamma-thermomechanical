@@ -44,6 +44,22 @@ def load_frames(folder):
     return by_time
 
 
+BUILD_PID = 1
+
+
+def _mean_build_temp(grid):
+    """Mean temperature restricted to build-region material cells (matches
+    compare_composition_modes_part004.py's convention) - NOT a whole-domain
+    mean, which would be diluted by not-yet-relevant substrate/ambient nodes."""
+    mat = grid.cell_data['material']
+    build_cells = np.where(mat == BUILD_PID)[0]
+    if not len(build_cells):
+        return float('nan')
+    sub = grid.extract_cells(build_cells)
+    build_pt_ids = np.unique(sub.point_data['vtkOriginalPointIds'])
+    return float(grid.point_data['temp'][build_pt_ids].mean())
+
+
 rows = []
 for v in args.values:
     arc_dir = os.path.join(args.results_dir, 'results_{}_LP{:g}'.format(args.arc_stem, v))
@@ -75,8 +91,8 @@ for v in args.values:
         transient_max_diff=float(max_diff_hist.max()),
         transient_max_diff_time=common_times[int(np.argmax(max_diff_hist))],
         final_max_diff=float(final_diff.max()), final_mean_diff=float(final_diff.mean()),
-        mean_build_temp_arc=float(arc_frames[t_final].point_data['temp'].mean()),
-        mean_build_temp_gx=float(gx_frames[t_final].point_data['temp'].mean()),
+        mean_build_temp_arc=_mean_build_temp(arc_frames[t_final]),
+        mean_build_temp_gx=_mean_build_temp(gx_frames[t_final]),
         frac_above_liquidus_arc=max(frac_liquidus_arc), frac_above_liquidus_gx=max(frac_liquidus_gx),
         n_frames=len(common_times),
     ))

@@ -8,8 +8,13 @@ parser = argparse.ArgumentParser(
 parser.add_argument('--k', required=True, help='input .k file, e.g. thinwall_IN718.k')
 parser.add_argument('--out', required=True, help='output folder for result frames, e.g. results_IN718')
 parser.add_argument('--toolpath', default='toolpath.crs',
-                     help='toolpath .crs file (default toolpath.crs in the cwd) - the *TOOL_FILE line '
-                          'inside the .k is ignored by this solver, so this is the only way to point at one')
+                     help='toolpath .crs file, resolved against --input-data-dir (not the cwd) - the '
+                          '*TOOL_FILE line inside the .k is ignored by this solver, so this is the only '
+                          'way to point at one. FIXED 2026-07-31: previously resolved against the cwd '
+                          'regardless of --input-data-dir, which silently loaded examples/wall/toolpath.crs '
+                          '(the wall demo\'s own short toolpath) whenever a bare filename was passed '
+                          'alongside a non-default --input-data-dir - see memory/project notes for the '
+                          'affected historical runs this produced.')
 parser.add_argument('--input-data-dir', default='.',
                      help='base dir that the .k file\'s relative curve/material paths (e.g. ./materials/foo_cp.txt) '
                           'are resolved against (default: cwd)')
@@ -66,7 +71,8 @@ def save_vtk(filename, time_value):
     active_grid.save(filename)
 
 
-domain = domain_mgr(filename=args.k, toolpathdir=args.toolpath, input_data_dir=args.input_data_dir)
+domain = domain_mgr(filename=args.k, toolpathdir=os.path.join(args.input_data_dir, args.toolpath),
+                     input_data_dir=args.input_data_dir)
 heat_solver = heat_solve_mgr(domain)
 endtime = domain.end_sim_time
 n_n = len(domain.nodes)

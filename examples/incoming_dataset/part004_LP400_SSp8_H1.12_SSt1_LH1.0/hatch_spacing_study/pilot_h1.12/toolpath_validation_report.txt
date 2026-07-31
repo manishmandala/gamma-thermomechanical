@@ -1,0 +1,19 @@
+=== Synthetic-toolpath validation: hatch_spacing_study/pilot_h1.12/4_synthetic_h1.12.k ===
+
+1. Mesh identity vs. base .k (must be UNCHANGED): PASS
+2. Toolpath bounds: x[-5.292,12.628] y[-12.141,31.358] z[0.000,8.000]
+   Mesh bounds:     x[-50.000,50.000] y[-49.936,49.936] z[-20.000,8.000]
+   toolpath z-extent within mesh z-extent: PASS
+
+3. Measured scan speed: mean=8.000000 median=8.000000 min=8.000000 max=8.000000 (expected 8.0000)
+   uniform speed across ALL segments (on and off): PASS
+
+4. Total path length: 6401.8603   ENDTIM: 800.2325   toolpath duration: 800.2325
+
+5. Build elements: 5800   never-reached (birth>=1e5 sentinel): 0 (0.000%)
+
+6. Birth-time range (real, non-sentinel build elements): [7.3126, 794.3115]
+   active-element count at 50 sampled times is monotonically non-decreasing: PASS
+   active count: t=0 -> 0, t=ENDTIM -> 5800
+
+7. Spatial alignment sample (200 elements): 0 exceed 2.0-unit distance from toolpath at their birth time (0.0%)
