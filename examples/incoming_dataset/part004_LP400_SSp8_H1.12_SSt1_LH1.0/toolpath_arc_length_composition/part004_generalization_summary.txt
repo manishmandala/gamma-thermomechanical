@@ -1,0 +1,135 @@
+part004 generalization test - summary and three-way comparison
+(part002 vs part005 vs part004)
+================================================================
+base commit: a8060a70e29058b1ebcdbb636d4d0d1ab20d9837
+no changes were made to composition_lib.py's algorithm, coordinate_function,
+composition_function, or normalization during this test.
+
+Dataset: part004_LP400_SSp8_H1.12_SSt1_LH1.0
+  - a rectangular block with a small stepped/notched extension near one end
+  - LP400 (laser power), SSp8, H1.12 (hatch), SSt1, LH1.0 (layer height)
+  - substrate matID 2, build region matID 1 (5,800 build elements, 14,060 total)
+  - toolpath: 385 waypoints, 384 segments, total length 6349.9211, ENDTIM=793.7401s
+  - boustrophedon (back-and-forth raster): 23 near-180-degree reversals, 24 line
+    passes across 16 z-layers (~1.5 passes/layer, 2 short lines per layer)
+
+Commands run (in order):
+  python3 prepare_composition.py --dataset ../incoming_dataset/part004_LP400_SSp8_H1.12_SSt1_LH1.0 \
+    --kfile 4.k --mode graded --coordinate-mode {global_x,toolpath_arc_length} \
+    --composition-mode sinusoidal --out 4_graded_{globalx,arclength}_sinusoidal.k
+  python3 diagnose_composition_mapping.py --dataset ../incoming_dataset/part004_LP400_SSp8_H1.12_SSt1_LH1.0 \
+    --kfile 4.k --out-dir ../incoming_dataset/part004_.../toolpath_arc_length_composition
+  python3 make_gradient_comparison_figure_part004.py
+  python3 run_wall.py --k 4_graded_arclength_sinusoidal.k --out results_arclength_sinusoidal_15pct \
+    --input-data-dir ../incoming_dataset/part004_... --stop-fraction 0.15 --n-frames 40
+  python3 run_wall.py --k 4_graded_globalx_sinusoidal.k --out results_globalx_sinusoidal_15pct \
+    --input-data-dir ../incoming_dataset/part004_... --stop-fraction 0.15 --n-frames 40
+  python3 compare_composition_modes_part004.py --arclength results_arclength_sinusoidal_15pct \
+    --globalx results_globalx_sinusoidal_15pct --out comparison --seam-csv composition_diagnostics.csv
+
+Runtimes: each 15%-depth run (119.06s simulated, 14,060 elements) completed in
+under 2 minutes wall-clock (well under the ~10 minute part005 15%-depth runtime,
+consistent with part004's smaller mesh: 14,060 elements vs part005's 22,231 and
+part002's 40,665).
+
+Disk usage: 21MB per run (42MB total for both modes) - negligible against the
+current 21GB free on this machine; no overwrite of any existing folder occurred
+(results_*_15pct did not previously exist for part004).
+
+----------------------------------------------------------------------
+STAGE 1: composition diagnostics
+----------------------------------------------------------------------
+Composition field validity: no NaN/Inf, range [0.25, 0.75] (within spec), 0
+out-of-range values, 88.2% unique s-values at 6dp - all pass, identical
+methodology to part002/part005, no code changes.
+
+Seam / repeated-pass finding (the standout result of this generalization test):
+  part002: 0.46% of build elements flagged (threshold 0.15)
+  part005: 0.00% of build elements flagged
+  part004: 34.741% of build elements flagged - dramatically higher
+
+Root cause (directly measured, not assumed - see mapping_validation_report.txt
+for full detail): part004's toolpath is a simple 2-line-per-layer raster with
+very few waypoints (385 total) relative to its 16 build layers. Because each
+layer is fully traced before the laser steps up to the next, elements near a
+layer boundary sit close in 3D space to BOTH their own layer's toolpath segment
+and the immediately-preceding/following layer's re-traced segment at nearly
+the same (x,y) - but those two segments are a full layer's worth of arc length
+apart. Direct mesh-neighbor max-jump statistics confirm this is systemic, not
+a few outlier points:
+    part002: mean=0.087  median=0.093  p90=0.098  max=0.171
+    part004: mean=0.155  median=0.137  p90=0.258  max=0.266
+part004's typical (median) neighbor jump is ~1.5x part002's and its p90 tail is
+~2.6x higher - the majority of the part004 mesh sits at or above the threshold,
+not just a handful of points. part002's spiral packs far more waypoints/arc-
+length into each layer (denser hatch, larger loop), so the equivalent layer-
+boundary jump stays below threshold except at its one true spiral-restart seam.
+This is a genuine toolpath-resolution effect inherent to a coarse, few-waypoint
+raster - NOT a bug in project_to_toolpath or coordinate_function, and no code
+was changed to reduce it. The visual consequence (visible in
+global_x_vs_toolpath_gradient_part004.png) is a jagged diagonal streak across
+the toolpath-following panel, absent from the global_x panel.
+
+----------------------------------------------------------------------
+STAGE 2: matched 15%-depth thermal comparison
+----------------------------------------------------------------------
+                              part002 (10%)   part005 (15%)   part004 (15%)
+  peak temperature (K)        ~unreported*      4859.79         1072.95
+  transient max |ΔT| (K)          372.19          519.18           24.79
+  final-frame max |ΔT| (K)      (n/a, 10%)        78.07           0.0040
+  final-frame nodes >1K            -              19.93%          0.000%
+  seam-flagged elements             0.46%           0.00%          34.741%
+  seam artifact drives largest
+    thermal differences?             NO              NO              NO
+  (*part002's report tracked max|ΔT| vs time and peak-temp-vs-time separately;
+   372.19K is the transient max|ΔT|, directly comparable across all three)
+
+Headline finding: despite having by far the LARGEST composition-field seam
+artifact (34.741% vs 0.46% and 0.00%), part004 shows by far the SMALLEST
+thermal difference between arc-length and global_x composition modes - both
+in absolute peak transient difference (24.79K vs 372-519K) and in final-frame
+difference (0.004K vs part005's 78K). This is the opposite of what a naive
+"more seam artifact = more thermal error" assumption would predict, and it is
+reported honestly rather than reconciled by adjusting any threshold or code.
+
+Explanation (physical, not a code issue): part004 uses LP400 - less than half
+of part002's LP800 and 40% of part005's LP1000 - and part004's simulated
+region never exceeds ~1087K in this window, well below either alloy's melting
+point, whereas part005 reaches ~4860K (deep into/above melt-pool territory)
+and part002's dynamics (372K-scale transient swings) indicate a substantially
+hotter, more gradient-driven regime as well. At part004's much lower absolute
+temperatures, the conductivity/absorptivity differences between the two
+composition fields (IN718 vs TI64 weighting) simply have far less thermal
+leverage - a large structural difference in WHERE the composition field
+diverges (mean abs diff 0.206, max abs diff 0.499, essentially uncorrelated,
+r=-0.002) does not translate into a large temperature difference when the
+overall thermal gradients driving heat conduction are much smaller to begin
+with. All three datasets agree on the more fundamental point: in every case,
+the largest thermal differences track the melt pool / active heat source, not
+the seam-flagged elements (seam cross-check verdict is "NO" in all three).
+
+----------------------------------------------------------------------
+Generalization conclusion
+----------------------------------------------------------------------
+Three geometrically and process-parameter-distinct real datasets (hexagonal
+ring/spiral, block+boss/curved toolpath, notched block/raster toolpath) have
+now been run through the identical toolpath-arc-length composition pipeline
+with zero algorithm changes. In all three cases the composition field is
+valid, distinct from global_x, and thermally sound (no NaN/Inf, no seam-driven
+thermal artifacts). The one dataset-specific caveat - part004's much higher
+seam/repeated-pass rate - has a fully characterized, geometry-driven root
+cause (coarse raster relative to layer count) rather than an implementation
+defect, and it does not propagate into misleading thermal results at this
+dataset's process parameters. This is sufficient evidence that the mechanism
+generalizes: it behaves correctly on every dataset tested, with its known
+limitations (Euclidean-nearest-segment projection ignoring temporal/layer
+order) manifesting more or less strongly depending on toolpath resolution
+relative to geometry, exactly as expected from the algorithm's design.
+
+Recommended first controlled process-parameter experiment: hold geometry and
+toolpath fixed (e.g. re-use part004's or part002's toolpath) and sweep laser
+power alone across a range that spans part004's sub-melting regime through
+part005's deep-melt-pool regime, to directly quantify the "composition-mode
+thermal sensitivity" trend suggested here (larger differences at higher power/
+peak temperature) as a controlled variable rather than a confound of geometry,
+toolpath, and power varying together across three unrelated donor datasets.

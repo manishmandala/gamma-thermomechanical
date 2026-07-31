@@ -1,0 +1,70 @@
+
+part004_LP400_SSp8_H1.12_SSt1_LH1.0 toolpath_arc_length mapping - validation statistics
+============================================================
+build elements: 5800
+toolpath: 385 waypoints, 384 segments, total length 6349.9211
+
+s (normalized path coordinate):
+  min=0.000853  max=0.992751
+  elements with s < 0.05: 496 (8.55%)
+  elements with s > 0.95: 281 (4.84%)
+
+nearest-projection distance (element centroid to toolpath):
+  mean=0.5844  median=0.5770  max=0.7503
+
+unique s values: 5114 of 5800 elements at 6dp (88.2% unique), 776 at 3dp
+
+segment assignment: 148 of 384 segments used by at least one element
+
+composition field validity:
+  any NaN? False  any inf? False
+  range: [0.250000, 0.750000] (must be within [0,1])
+  out-of-[0,1] values: 0
+
+seam / repeated-pass / large-neighbor-jump inspection (threshold=0.15):
+  flagged elements: 2015 of 5800 (34.741%)
+  z range of flagged elements: [1.500, 7.500]
+  best_segment range of flagged elements: [7, 379]
+
+comparison vs. global_x composition field:
+  mean abs difference: 0.206039  max abs difference: 0.498990
+  correlation: -0.0023
+
+seam/repeated-pass root-cause investigation (added after initial diagnostics; no code
+or algorithm change made - this is a direct measurement of the toolpath geometry to
+explain the 34.741% flag rate honestly, per instruction not to alter code to make
+datasets look similar):
+  - part004's toolpath is a simple boustrophedon (back-and-forth) raster: 385 waypoints,
+    23 near-180-degree reversals, 24 line passes total, spread over only 16 distinct
+    z-layers (~1.5 passes/layer). Each layer is filled by 1-2 short straight lines
+    (as few as 2 waypoints, up to ~33) covering two geometrically distinct footprint
+    regions (consistent with the notched/stepped part geometry), then the laser steps
+    up ~0.5-1.0mm in z and re-traces nearly the SAME (x,y) footprint for the next layer.
+  - Directly re-computing the mesh-neighbor max-s-jump (identical calculation to the
+    seam_mask check above) for part002 and part004 side by side:
+        part002: mean=0.0866  median=0.0928  p90=0.0983  p99=0.1127  max=0.1708
+        part004: mean=0.1554  median=0.1373  p90=0.2581  p99=0.2645  max=0.2655
+    part004's TYPICAL (median) neighbor-to-neighbor jump is already ~1.5x part002's,
+    and its p90 tail is ~2.6x higher - this is not a few outlier seam points crossing
+    threshold, it is the majority of the mesh sitting close to or above the 0.15 cut.
+  - Root cause: part004's raster has far fewer waypoints per unit of geometry covered
+    than part002's spiral (385 waypoints covering a small, simple 2-line-per-layer
+    footprint vs. part002's much denser multi-waypoint hatch per layer). Because each
+    layer is deposited by tracing almost the identical (x,y) sweep before stepping up
+    in z, an element sitting near a layer boundary is physically close (in 3D) to BOTH
+    its own layer's toolpath segment and the adjacent layer's re-traced segment - but
+    those two segments are a full layer's worth of arc-length apart (since the toolpath
+    is one continuous, time-ordered path: finish layer N entirely, then start layer
+    N+1). With only 16 layers and ~24 total passes, each layer consumes a large,
+    coarse chunk of total arc length (~1/16-1/24 of the total path each), so this
+    layer-to-layer jump routinely exceeds the 0.15 threshold. part002's spiral covers
+    proportionally more arc length per layer (more waypoints, denser hatch), so the
+    equivalent layer-boundary jump stays smaller relative to threshold except at the
+    one true spiral-restart seam.
+  - This is a genuine toolpath-resolution effect, not a bug in project_to_toolpath or
+    coordinate_function: nearest-segment projection is doing exactly what it is
+    specified to do. The composition field remains fully valid (bounded, no NaN,
+    distinct from global_x). The practical consequence is that part004's
+    toolpath_arc_length composition field will look visibly coarser/more
+    "layer-banded" through the build (z) direction than part002's or part005's,
+    because there is far less toolpath resolution available to interpolate through.
