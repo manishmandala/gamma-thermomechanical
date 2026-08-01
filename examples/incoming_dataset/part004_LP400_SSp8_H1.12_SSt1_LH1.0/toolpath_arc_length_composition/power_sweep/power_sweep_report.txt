@@ -1,0 +1,119 @@
+Controlled laser-power sweep on part004 - methodology + results
+================================================================
+CORRECTED RERUN (2026-07-31, later) - the previous version of this report
+described results from a run affected by a real bug: run_wall.py's
+--toolpath flag was used as-is relative to the working directory and was
+never joined with --input-data-dir, so every run in the original sweep
+silently loaded examples/wall/toolpath.crs (the wall demo's own 38-second
+toolpath) instead of part004's real ~800-second toolpath. Verified directly:
+the original runs showed peak temperature occurring once at t~15s then
+monotonically cooling for the rest of the window, with the hottest node
+frozen in a ~2mm patch - physically inconsistent with a real, continuously
+active raster. Fixed in run_wall.py (--toolpath now joined with
+--input-data-dir). This report reflects the RERUN with the fix. The
+original (invalid) analysis outputs are kept, unmodified, at
+../power_sweep/analysis_OLD_INVALID/ for comparison/transparency - do not
+use them for anything except illustrating the bug's effect.
+
+Dataset: part004_LP400_SSp8_H1.12_SSt1_LH1.0 (raster toolpath, notched
+block; the real toolpath was later found to be a genuine dense raster - 17
+tracks/layer at exactly 1.12mm spacing - not the sparse raster an earlier
+report claimed).
+Sweep parameter: *GAUSS_LASER power (field 0), isolation-verified by
+generate_parameter_sweep.py (every generated deck diffed line-by-line
+against the base; all 10 decks confirmed to differ from base in exactly
+one line). Beam radius (1.12) and absorptivity (0.4) held fixed.
+Everything else identical by construction: geometry, mesh, toolpath.crs,
+composition deck (only the *GAUSS_LASER token differs), --stop-fraction 0.15,
+--n-frames 40, materials, boundary conditions.
+
+Sweep values: 400, 600, 800, 1000, 1200 W (5 points, 200W steps).
+10 runs total (5 powers x {arc_length, global_x} composition mode), each
+completed in ~5.3 minutes with the CORRECT toolpath (vs. ~2 minutes for the
+broken runs - the real, continuously active raster does genuinely more
+numerical work than a heat source frozen for 80% of the window).
+
+----------------------------------------------------------------------
+Results (see analysis/parameter_sweep_summary.csv for full table)
+----------------------------------------------------------------------
+Power(W)  Peak T arc(K)  Peak T gx(K)  Transient max|dT|(K)  Final max|dT|(K)  %>liquidus
+400       2629.4         2410.4        218.97                149.17            0.001%
+600       3367.0         3201.5        303.21                168.81            0.001%
+800       4155.6         4031.5        363.33                363.33            0.003%
+1000      4913.6         4732.4        490.33                291.36            0.004%
+1200      5598.7         5492.5        431.88                431.88            0.005%
+
+These numbers are dramatically different from the invalid original sweep
+(peak temps 1073-2057K there vs. 2629-5599K now; transient max|dT| 24-27K
+there vs. 219-490K now - roughly 10-20x larger). The corrected picture:
+
+1. Peak temperature: monotonically increasing, roughly linear-to-mildly-
+   accelerating (increments of 738K, 738K, 789K, 758K, 685K per 200W step -
+   fairly steady, no strong saturation over this range once the real
+   toolpath's full, continuous heating is captured).
+
+2. Melt-pool proxy (% > liquidus): melting is present at EVERY power level
+   now (0.001-0.005%), unlike the original sweep where it only began at
+   1000W. The real, continuously-active raster reaches melting even at
+   400W. Melt fraction grows roughly monotonically with power (with 1000W
+   slightly below 1200W's trend but both higher than 800W).
+
+3. Composition-induced transient max|dT|: substantial and clearly power-
+   dependent (219K -> 490K from 400W to 1000W), NOT flat as the invalid
+   sweep wrongly showed. Quadratic fit R^2=0.905 vs linear R^2=0.830 - both
+   reasonably good fits, mildly nonlinear. Notably NON-MONOTONIC: it peaks
+   at 1000W (490K) then DROPS at 1200W (432K) - the automated per-interval
+   slope check flags [800,1000] as the steepest interval, not [1000,1200].
+   This dip is a single data point on a 5-point sweep and should not be
+   over-interpreted as a real physical reversal without a repeat run at
+   1200W to check it isn't noise - flagged as the top follow-up.
+
+4. Relative composition sensitivity (transient max|dT| / peak temperature
+   rise above 300K): 0.094, 0.099, 0.094, 0.106, 0.082 - notably STABLE
+   (roughly 0.08-0.11) across the whole range, in contrast to the invalid
+   sweep's reported steadily-decreasing trend (0.032 -> 0.015). With the
+   correct toolpath, composition choice's relative importance does NOT
+   meaningfully change with power over this range (aside from the same
+   1200W dip noted above) - the absolute difference grows roughly in step
+   with the overall thermal magnitude, not disproportionately faster or
+   slower.
+
+5. Final-frame max|dT|: substantial (149-432K) and NOT decayed by the end
+   of the 15%-depth window at any power level - a real, qualitative
+   difference from the invalid sweep's near-zero (0.004-0.012K) final-frame
+   values. This makes physical sense: with real, continuous heating
+   throughout the whole window, there is always recent thermal activity
+   that hasn't fully re-equilibrated by a fixed depth cutoff, unlike the
+   broken runs which had ~80 seconds of pure passive cooling to flatten out
+   any residual difference.
+
+----------------------------------------------------------------------
+Verdict on linear/nonlinear/threshold (task 5, corrected)
+----------------------------------------------------------------------
+NONLINEAR (quadratic R^2=0.905 vs linear R^2=0.830) but WITHOUT a clean
+single threshold/knee the way the (invalid) original sweep appeared to
+show - melting is present at every power level here, so there is no clean
+"before/after melting" transition within this range to point to. The
+non-monotonic dip at 1200W is the most notable feature and needs a repeat
+run to confirm before drawing a firm conclusion about the shape of the
+curve at the top of this range.
+
+----------------------------------------------------------------------
+Corrected headline finding
+----------------------------------------------------------------------
+Laser power DOES have a substantial effect on composition-induced thermal
+sensitivity over this range (219K to 490K, over 2x) - the opposite of the
+original (invalid) sweep's "power has only a weak effect" conclusion. What
+stays comparatively stable is the RELATIVE sensitivity (~0.08-0.11 of the
+peak temperature rise), suggesting the absolute effect scales roughly in
+proportion with the overall thermal magnitude rather than power
+disproportionately amplifying or damping composition's importance, over
+this specific power range.
+
+----------------------------------------------------------------------
+Infrastructure (unchanged, reusable for future sweeps)
+----------------------------------------------------------------------
+examples/wall/generate_parameter_sweep.py, run_parameter_sweep.py,
+analyze_parameter_sweep.py - see prior report version for details. The
+critical fix this round was entirely in run_wall.py's toolpath-path
+resolution, not in any of the sweep-specific scripts.
