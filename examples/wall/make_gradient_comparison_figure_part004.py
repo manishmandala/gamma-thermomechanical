@@ -1,4 +1,4 @@
-# Same side-by-side composition-mapping figure as make_gradient_comparison_figure.py
+# Same side-by-side composition-mapping figure as make_gradient_comparison_figure_part002.py
 # and its part005 counterpart, applied to part004 (a rectangular block with a
 # small stepped/notched extension - a distinctly different, more raster-like
 # geometry than part002's hexagonal ring or part005's block+boss). Same

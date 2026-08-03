@@ -1,6 +1,6 @@
 # Parameterized runner for *EXTERNAL_MESH control files - takes the control
 # file and output folder as CLI args instead of hand-copying a new .py file
-# per material (see main_wall_TI64.py/IN718.py/Cu.py - flagged as tech debt;
+# per material (see legacy_main_wall_pure_TI64.py/pure_IN718.py/pure_Cu.py - flagged as tech debt;
 # this is the fix for that pattern going forward). Generalizes
 # main_external_mesh_test.py's logic (left untouched as a reference example)
 # so pure-IN718, pure-1018, and graded runs on Rowan's mesh all share one

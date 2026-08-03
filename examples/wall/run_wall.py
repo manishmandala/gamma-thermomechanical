@@ -1,3 +1,10 @@
+# Unified thermal(-mechanical) simulation runner for any wall-example .k
+# file - point it at a deck and an output folder via CLI args instead of
+# hand-editing a script per material/composition mode. Replaces the six
+# legacy_main_wall_*.py scripts (kept for reference, not used going
+# forward). This is the ONLY runner used throughout the toolpath-arc-length
+# composition project (examples/incoming_dataset/part00N_.../).
+
 import argparse
 import os
 

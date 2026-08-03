@@ -1,6 +1,5 @@
-# 15%-depth matched comparison, toolpath_arc_length vs global_x (both
-# sinusoidal) on part004 - generalization check, same script structure as
-# compare_composition_modes_10pct.py (part002). Extends compare_composition_modes.py's pattern
+# 10%-depth matched comparison, toolpath_arc_length vs global_x (both
+# sinusoidal) on part002. Extends compare_composition_modes_part002_1pct.py's pattern
 # (matched-by-TIME comparison) with per-frame time series (not just final-
 # frame stats), a max-temperature-difference-vs-time plot, and a spatial
 # cross-check against the known repeated-pass seam elements (identified by
@@ -24,7 +23,7 @@ parser.add_argument('--arclength', required=True)
 parser.add_argument('--globalx', required=True)
 parser.add_argument('--out', required=True)
 parser.add_argument('--seam-csv', default=None,
-                     help='composition_diagnostics.csv - used to cross-check the repeated-pass '
+                     help='part002_composition_diagnostics.csv - used to cross-check the repeated-pass '
                           'seam elements against the largest thermal differences')
 parser.add_argument('--seam-jump-threshold', type=float, default=0.15,
                      help='s-jump-to-neighbor threshold used to (re)identify seam elements, matching '
@@ -119,9 +118,9 @@ if args.seam_csv and os.path.exists(args.seam_csv):
     all_xyz = np.array([[float(r['centroid_x']), float(r['centroid_y']), float(r['centroid_z'])] for r in rows])
     all_eid = np.array([int(r['element_id']) for r in rows])
     # rebuild the same neighbor-jump seam detector used during the original diagnosis
-    diag_vtu_path = os.path.join(os.path.dirname(args.seam_csv), 'composition_diagnostics.vtu')
+    diag_vtu_path = os.path.join(os.path.dirname(args.seam_csv), 'part002_composition_diagnostics.vtu')
     diag = pv.read(diag_vtu_path)
-    s_diag = diag.cell_data['path_coordinate_s']
+    s_diag = diag.cell_data['s_arc_length']
     max_jump = np.zeros(diag.n_cells)
     for i in range(diag.n_cells):
         nb = diag.cell_neighbors(i, connections='points')
@@ -155,7 +154,7 @@ else:
 
 # ---- report ----
 lines = []
-lines.append('15%-depth composition-mode thermal comparison: toolpath_arc_length vs global_x (part004)')
+lines.append('10%-depth composition-mode thermal comparison: toolpath_arc_length vs global_x (part002)')
 lines.append('=' * 70)
 lines.append('matched frames: {}'.format(len(common_times)))
 lines.append('')
@@ -199,7 +198,7 @@ lines.extend(seam_report_lines)
 
 report = '\n'.join(lines)
 print('\n' + report)
-with open(os.path.join(args.out, 'composition_mode_comparison_15pct_report.txt'), 'w') as f:
+with open(os.path.join(args.out, 'composition_mode_comparison_10pct_report.txt'), 'w') as f:
     f.write(report + '\n')
 
 # ---- comparison VTU (final matched frame) ----
@@ -209,14 +208,14 @@ comp_grid.point_data['temperature_global_x'] = gg_final.point_data['temp']
 comp_grid.point_data['temperature_difference'] = ga_final.point_data['temp'] - gg_final.point_data['temp']
 comp_grid.cell_data['composition_arc_length'] = ga_final.cell_data['composition']
 comp_grid.cell_data['composition_global_x'] = gg_final.cell_data['composition']
-diag_vtu = os.path.join(os.path.dirname(args.arclength), 'composition_diagnostics.vtu')
+diag_vtu = os.path.join(os.path.dirname(args.arclength), 'part002_composition_diagnostics.vtu')
 s_field = np.full(comp_grid.n_cells, np.nan)
 if os.path.exists(diag_vtu):
     diag = pv.read(diag_vtu)
     if comp_grid.n_cells == diag.n_cells:
-        s_field = diag.cell_data['path_coordinate_s']
+        s_field = diag.cell_data['s_arc_length']
 comp_grid.cell_data['path_coordinate_s'] = s_field
-vtu_path = os.path.join(args.out, 'part004_composition_mode_comparison_15pct_final_frame.vtu')
+vtu_path = os.path.join(args.out, 'part002_composition_mode_comparison_10pct_final_frame.vtu')
 comp_grid.save(vtu_path)
 print('wrote {}'.format(vtu_path))
 
@@ -225,32 +224,32 @@ fig, ax = plt.subplots(figsize=(7, 4.5))
 ax.plot(times, peak_arc_hist, label='toolpath_arc_length', color='#c0392b')
 ax.plot(times, peak_gx_hist, label='global_x', color='#2a78d6')
 ax.set_xlabel('sim time (s)'); ax.set_ylabel('peak temperature (K)')
-ax.set_title('Peak temperature vs. time (15% depth, part004)')
+ax.set_title('Peak temperature vs. time (10% depth, part002)')
 ax.legend(); ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
-fig.tight_layout(); fig.savefig(os.path.join(args.out, 'peak_temperature_vs_time_15pct.png'), dpi=200); plt.close(fig)
+fig.tight_layout(); fig.savefig(os.path.join(args.out, 'peak_temperature_vs_time_10pct.png'), dpi=200); plt.close(fig)
 
 fig, ax = plt.subplots(figsize=(7, 4.5))
 ax.plot(times, mean_build_arc_hist, label='toolpath_arc_length', color='#c0392b')
 ax.plot(times, mean_build_gx_hist, label='global_x', color='#2a78d6')
 ax.set_xlabel('sim time (s)'); ax.set_ylabel('mean active-build-region temperature (K)')
-ax.set_title('Mean active-build-region temperature vs. time (15% depth, part004)')
+ax.set_title('Mean active-build-region temperature vs. time (10% depth, part002)')
 ax.legend(); ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
-fig.tight_layout(); fig.savefig(os.path.join(args.out, 'mean_build_temperature_vs_time_15pct.png'), dpi=200); plt.close(fig)
+fig.tight_layout(); fig.savefig(os.path.join(args.out, 'mean_build_temperature_vs_time_10pct.png'), dpi=200); plt.close(fig)
 
 fig, ax = plt.subplots(figsize=(7, 4.5))
 ax.plot(times, max_diff_hist, color='#6a4fb0')
 ax.set_xlabel('sim time (s)'); ax.set_ylabel('max |T_arc_length - T_global_x| (K)')
-ax.set_title('Maximum temperature difference vs. time (15% depth, part004)')
+ax.set_title('Maximum temperature difference vs. time (10% depth, part002)')
 ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
-fig.tight_layout(); fig.savefig(os.path.join(args.out, 'max_temperature_difference_vs_time_15pct.png'), dpi=200); plt.close(fig)
+fig.tight_layout(); fig.savefig(os.path.join(args.out, 'max_temperature_difference_vs_time_10pct.png'), dpi=200); plt.close(fig)
 
 fig, ax = plt.subplots(figsize=(7, 4.5))
 ax.hist(final_diff, bins=60, color='#6a4fb0')
 ax.set_yscale('log')
 ax.set_xlabel('|T_arc_length - T_global_x| (K) at final matched frame')
 ax.set_ylabel('node count (log scale)')
-ax.set_title('Final-frame temperature-difference distribution (15% depth)')
+ax.set_title('Final-frame temperature-difference distribution (10% depth)')
 ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
-fig.tight_layout(); fig.savefig(os.path.join(args.out, 'final_frame_difference_distribution_15pct.png'), dpi=200); plt.close(fig)
+fig.tight_layout(); fig.savefig(os.path.join(args.out, 'final_frame_difference_distribution_10pct.png'), dpi=200); plt.close(fig)
 
 print('wrote plots to {}'.format(args.out))

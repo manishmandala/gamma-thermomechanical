@@ -1,3 +1,8 @@
+# LEGACY - superseded by run_wall.py. Pure-Cu control run: same
+# geometry/toolpath/laser as thinwall_graded_cu.k, but the deposited wall
+# is 100% Cu - one endpoint of a TI64-vs-Cu-vs-graded comparison. Kept for
+# historical reference only; do not use for new work.
+
 import cupy as cp
 import numpy as np
 import cupyx.scipy.sparse as cusparse

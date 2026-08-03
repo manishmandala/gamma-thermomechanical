@@ -1,3 +1,11 @@
+# LEGACY - superseded by run_wall.py. Self-contained, monolithic reference
+# implementation (does NOT import gamma.simulator - has its own inline
+# copies of domain_mgr/heat_solve_mgr/elastic_stiff_matrix/etc.), predating
+# the shared package used everywhere else in this project. Despite the
+# "_cpu" name it still uses cupy (GPU) - the name refers to its
+# 'results_cpu/' output folder, not a CPU-only code path. Kept for
+# historical reference only; do not use for new work.
+
 import os
 import cupy as cp
 import numpy as np

@@ -1,3 +1,9 @@
+# LEGACY - superseded by run_wall.py. Pure-TI64 control run: same
+# geometry/toolpath/laser as thinwall_graded.k, but the deposited wall is
+# 100% TI64 (unmodified base material) - one endpoint of a
+# TI64-vs-IN718-vs-graded comparison. Kept for historical reference only;
+# do not use for new work.
+
 import cupy as cp
 import numpy as np
 import cupyx.scipy.sparse as cusparse
@@ -8,6 +14,9 @@ cp.cuda.Device(0).use()
 import pyvista as pv
 import vtk
 
+# Pure-TI64 control run: same geometry/toolpath/laser as thinwall_graded.k,
+# but the deposited wall is 100% TI64 (thinwall_clean.k, matID 1 unmodified) -
+# used as one endpoint of a TI64-vs-IN718-vs-graded temperature comparison.
 
 def save_vtk(filename, time_value):
     n_e_save = cp.sum(domain.active_elements)
@@ -33,7 +42,7 @@ def save_vtk(filename, time_value):
     active_grid.save(filename)
 
 
-domain = domain_mgr(filename='thinwall.k')
+domain = domain_mgr(filename='thinwall_clean.k')
 heat_solver = heat_solve_mgr(domain)
 endtime = domain.end_sim_time
 n_n = len(domain.nodes)
@@ -50,34 +59,24 @@ Jac = cp.matmul(domain.Bip_ele,nodes_pos[:,cp.newaxis,:,:].repeat(8,axis=1))
 ele_detJac = cp.linalg.det(Jac)
 
 t = 0
-filename = 'results/wall_{:04d}.vtk'.format(file_num)
+filename = 'results_TI64/wall_{:04d}.vtu'.format(file_num)
 save_vtk(filename, 0.0)
 file_num = file_num + 1
 
 # ---- run settings ----
-STOP_FRACTION = 0.1     # 0.10 = 10% preview. Set to 1.0 for the real full run.
-N_FRAMES = 200           # more frames so the fast (1s) deposit sweeps get several frames each, not just the long dwell
+STOP_FRACTION = 0.5     # match the graded-composition comparison run's depth
+N_FRAMES = 200
 stop_time = STOP_FRACTION * endtime
 save_interval = stop_time / N_FRAMES
 next_save_time = save_interval
 bar_len = 30
 
-# ---- temperature logging at the base-substrate node ----
-node_id = 3710           # base-center node (x=0, y=-0.1, z=-4.0)
-log_every = 20
-time_hist = []
-temp_hist = []
-
 while domain.current_sim_time < endtime - domain.dt:
     t = t + 1
     heat_solver.time_integration()
 
-    if t % log_every == 0:
-        time_hist.append(float(domain.current_sim_time))
-        temp_hist.append(float(heat_solver.temperature[node_id]))
-
     if domain.current_sim_time >= next_save_time:
-        save_vtk('results/wall_{:04d}.vtk'.format(file_num), float(domain.current_sim_time))
+        save_vtk('results_TI64/wall_{:04d}.vtu'.format(file_num), float(domain.current_sim_time))
         file_num = file_num + 1
         next_save_time = next_save_time + save_interval
 
@@ -91,15 +90,8 @@ while domain.current_sim_time < endtime - domain.dt:
         cp.get_default_memory_pool().free_all_blocks()
 
     if domain.current_sim_time >= stop_time:
-        save_vtk('results/wall_{:04d}.vtk'.format(file_num), float(domain.current_sim_time))
+        save_vtk('results_TI64/wall_{:04d}.vtu'.format(file_num), float(domain.current_sim_time))
         print('\nReached {:.0f}% of the build - stopping early.'.format(100*STOP_FRACTION))
         break
 
-# ---- write the temperature history to a CSV after the run ----
-import csv
-with open('temperature_history.csv', 'w', newline='') as fcsv:
-    writer = csv.writer(fcsv)
-    writer.writerow(['time_s', 'temperature_K'])
-    for tt, TT in zip(time_hist, temp_hist):
-        writer.writerow([tt, TT])
-print('\nSaved temperature_history.csv with {} rows'.format(len(time_hist)))
+print('\nDone - {} frames written to results_TI64/'.format(file_num))

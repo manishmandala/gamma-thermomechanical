@@ -1,3 +1,8 @@
+# LEGACY - superseded by run_wall.py. Pure-IN718 control run: same
+# geometry/toolpath/laser as thinwall_graded.k, but the deposited wall is
+# 100% IN718 - one endpoint of a TI64-vs-IN718-vs-graded comparison. Kept
+# for historical reference only; do not use for new work.
+
 import cupy as cp
 import numpy as np
 import cupyx.scipy.sparse as cusparse
@@ -8,6 +13,10 @@ cp.cuda.Device(0).use()
 import pyvista as pv
 import vtk
 
+# Pure-IN718 control run: same geometry/toolpath/laser as thinwall_graded.k,
+# but the deposited wall is 100% IN718 (thinwall_IN718.k - matID 1 swapped to
+# IN718 properties, matID 2 base plate left as TI64) - used as the other
+# endpoint of a TI64-vs-IN718-vs-graded temperature comparison.
 
 def save_vtk(filename, time_value):
     n_e_save = cp.sum(domain.active_elements)
@@ -25,9 +34,6 @@ def save_vtk(filename, time_value):
     S13 = transformation(S[0:n_e_save,:,5], domain.elements[0:n_e_save], ele_detJac[0:n_e_save],n_n_save)
     active_grid = pv.UnstructuredGrid(active_cells, active_cell_type, points)
     active_grid.cell_data['material'] = domain.element_mat[domain.active_elements]
-    # material is flat (101) across the whole graded wall now - composition is
-    # the field that actually shows the gradient for a continuous field.
-    active_grid.cell_data['composition'] = domain.element_composition[domain.active_elements].get()
     active_grid.point_data['temp'] = heat_solver.temperature[0:n_n_save].get()
     active_grid.point_data['U1'] = U[0:n_n_save,0].get()
     active_grid.point_data['U2'] = U[0:n_n_save,1].get()
@@ -36,7 +42,7 @@ def save_vtk(filename, time_value):
     active_grid.save(filename)
 
 
-domain = domain_mgr(filename='thinwall_graded.k')
+domain = domain_mgr(filename='thinwall_IN718.k')
 heat_solver = heat_solve_mgr(domain)
 endtime = domain.end_sim_time
 n_n = len(domain.nodes)
@@ -53,13 +59,13 @@ Jac = cp.matmul(domain.Bip_ele,nodes_pos[:,cp.newaxis,:,:].repeat(8,axis=1))
 ele_detJac = cp.linalg.det(Jac)
 
 t = 0
-filename = 'results_graded/wall_{:04d}.vtu'.format(file_num)
+filename = 'results_IN718/wall_{:04d}.vtu'.format(file_num)
 save_vtk(filename, 0.0)
 file_num = file_num + 1
 
 # ---- run settings ----
-STOP_FRACTION = 0.5     # 0.10 = 10% preview. Set to 1.0 for the real full run.
-N_FRAMES = 200           # more frames so the fast (1s) deposit sweeps get several frames each, not just the long dwell
+STOP_FRACTION = 0.5     # match the graded-composition comparison run's depth
+N_FRAMES = 200
 stop_time = STOP_FRACTION * endtime
 save_interval = stop_time / N_FRAMES
 next_save_time = save_interval
@@ -70,7 +76,7 @@ while domain.current_sim_time < endtime - domain.dt:
     heat_solver.time_integration()
 
     if domain.current_sim_time >= next_save_time:
-        save_vtk('results_graded/wall_{:04d}.vtu'.format(file_num), float(domain.current_sim_time))
+        save_vtk('results_IN718/wall_{:04d}.vtu'.format(file_num), float(domain.current_sim_time))
         file_num = file_num + 1
         next_save_time = next_save_time + save_interval
 
@@ -84,8 +90,8 @@ while domain.current_sim_time < endtime - domain.dt:
         cp.get_default_memory_pool().free_all_blocks()
 
     if domain.current_sim_time >= stop_time:
-        save_vtk('results_graded/wall_{:04d}.vtu'.format(file_num), float(domain.current_sim_time))
+        save_vtk('results_IN718/wall_{:04d}.vtu'.format(file_num), float(domain.current_sim_time))
         print('\nReached {:.0f}% of the build - stopping early.'.format(100*STOP_FRACTION))
         break
 
-print('\nDone - {} frames written to results_graded/'.format(file_num))
+print('\nDone - {} frames written to results_IN718/'.format(file_num))

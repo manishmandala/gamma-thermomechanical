@@ -1,6 +1,6 @@
 # 15%-depth matched comparison, toolpath_arc_length vs global_x (both
-# sinusoidal) on part005 - generalization check, same script structure as
-# compare_composition_modes_10pct.py (part002). Extends compare_composition_modes.py's pattern
+# sinusoidal) on part004 - generalization check, same script structure as
+# compare_composition_modes_part002_10pct.py (part002). Extends compare_composition_modes_part002_1pct.py's pattern
 # (matched-by-TIME comparison) with per-frame time series (not just final-
 # frame stats), a max-temperature-difference-vs-time plot, and a spatial
 # cross-check against the known repeated-pass seam elements (identified by
@@ -155,7 +155,7 @@ else:
 
 # ---- report ----
 lines = []
-lines.append('15%-depth composition-mode thermal comparison: toolpath_arc_length vs global_x (part005)')
+lines.append('15%-depth composition-mode thermal comparison: toolpath_arc_length vs global_x (part004)')
 lines.append('=' * 70)
 lines.append('matched frames: {}'.format(len(common_times)))
 lines.append('')
@@ -216,7 +216,7 @@ if os.path.exists(diag_vtu):
     if comp_grid.n_cells == diag.n_cells:
         s_field = diag.cell_data['path_coordinate_s']
 comp_grid.cell_data['path_coordinate_s'] = s_field
-vtu_path = os.path.join(args.out, 'part005_composition_mode_comparison_15pct_final_frame.vtu')
+vtu_path = os.path.join(args.out, 'part004_composition_mode_comparison_15pct_final_frame.vtu')
 comp_grid.save(vtu_path)
 print('wrote {}'.format(vtu_path))
 
@@ -225,7 +225,7 @@ fig, ax = plt.subplots(figsize=(7, 4.5))
 ax.plot(times, peak_arc_hist, label='toolpath_arc_length', color='#c0392b')
 ax.plot(times, peak_gx_hist, label='global_x', color='#2a78d6')
 ax.set_xlabel('sim time (s)'); ax.set_ylabel('peak temperature (K)')
-ax.set_title('Peak temperature vs. time (15% depth, part005)')
+ax.set_title('Peak temperature vs. time (15% depth, part004)')
 ax.legend(); ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
 fig.tight_layout(); fig.savefig(os.path.join(args.out, 'peak_temperature_vs_time_15pct.png'), dpi=200); plt.close(fig)
 
@@ -233,14 +233,14 @@ fig, ax = plt.subplots(figsize=(7, 4.5))
 ax.plot(times, mean_build_arc_hist, label='toolpath_arc_length', color='#c0392b')
 ax.plot(times, mean_build_gx_hist, label='global_x', color='#2a78d6')
 ax.set_xlabel('sim time (s)'); ax.set_ylabel('mean active-build-region temperature (K)')
-ax.set_title('Mean active-build-region temperature vs. time (15% depth, part005)')
+ax.set_title('Mean active-build-region temperature vs. time (15% depth, part004)')
 ax.legend(); ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
 fig.tight_layout(); fig.savefig(os.path.join(args.out, 'mean_build_temperature_vs_time_15pct.png'), dpi=200); plt.close(fig)
 
 fig, ax = plt.subplots(figsize=(7, 4.5))
 ax.plot(times, max_diff_hist, color='#6a4fb0')
 ax.set_xlabel('sim time (s)'); ax.set_ylabel('max |T_arc_length - T_global_x| (K)')
-ax.set_title('Maximum temperature difference vs. time (15% depth, part005)')
+ax.set_title('Maximum temperature difference vs. time (15% depth, part004)')
 ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
 fig.tight_layout(); fig.savefig(os.path.join(args.out, 'max_temperature_difference_vs_time_15pct.png'), dpi=200); plt.close(fig)
 

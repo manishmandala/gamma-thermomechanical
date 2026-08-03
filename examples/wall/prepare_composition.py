@@ -25,7 +25,7 @@
 #
 # WHICH material ID is "the build region" is determined by BIRTH TIME, not
 # by the file's own *PART names - this project has already hit this exact
-# trap once before (see gradient_material_continuous_cu.py's header note on
+# trap once before (see gradient_material_continuous_TI64_Cu.py's header note on
 # thinwall.k) and it recurred independently on the new OneDrive datasets
 # (part002's *PART block calls pid 1 "Substrate" and pid 2 "Build", but pid
 # 1 is the one with real, progressive birth times - i.e. actually the
@@ -167,7 +167,7 @@ else:  # constant_inconel / constant_titanium / graded
             s = coordinate_function(centroids, args.coordinate_mode, bounds=bounds)
         # single-axis coordinate (z_norm=0.0) - see module docstring for why sinusoidal
         # degenerates cleanly to a pure function of s in this case (its z-wave term
-        # evaluates to sin(0)=0), and gradient_material_continuous.py's own 2D x/z
+        # evaluates to sin(0)=0), and gradient_material_continuous_TI64_IN718.py's own 2D x/z
         # sinusoidal behavior is untouched by this - that script never calls this path.
         frac_TI64_by_eid = {eid: composition_function(float(s[i]), 0.0, args.composition_mode)
                              for i, eid in enumerate(build_element_ids)}
@@ -192,7 +192,7 @@ else:  # constant_inconel / constant_titanium / graded
     # / *END as sequential `if`s sharing one `line` variable, not `elif`; putting this
     # block before *DEFINE_CURVE would make *DEFINE_CURVE's inner loop terminate on
     # THIS block's own header, silently skipping every birth time in the file. Same
-    # gotcha documented in gradient_material_continuous_cu.py. build_element_ids was
+    # gotcha documented in gradient_material_continuous_TI64_Cu.py. build_element_ids was
     # captured before any line-shifting edits above, so it's still valid here.
     node_insert_at = next(i for i, l in enumerate(lines) if l.startswith('*NODE'))
     comp_lines = ['*ELEMENT_COMPOSITION\n', '%10d\n' % build_pid]

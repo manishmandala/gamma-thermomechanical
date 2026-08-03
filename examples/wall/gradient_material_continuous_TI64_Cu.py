@@ -8,12 +8,12 @@
 # *MAT_THERMAL_GRADED_TD / *ELEMENT_COMPOSITION handling in
 # src/gamma/simulator/gamma.py) - this script only writes the composition
 # field, it does not pre-blend curves or bake discrete materials the way
-# gradient_material.py (the 70-band predecessor) does. No fixed step count:
+# gradient_material_discrete_bands_TI64_IN718.py (the 70-band predecessor) does. No fixed step count:
 # however many wall elements the mesh has, that's how many distinct
 # compositions you get - nothing needs to divide evenly into anything.
 #
 # Reads thinwall_clean.k - the pre-gradient mesh (2 plain TI64 materials,
-# matches commit 3776a6d's thinwall.k before gradient_material.py ever ran) -
+# matches commit 3776a6d's thinwall.k before gradient_material_discrete_bands_TI64_IN718.py ever ran) -
 # not the committed 70-band thinwall.k, and writes to a separate output file
 # so both variants stay available for comparison.
 #
@@ -27,7 +27,7 @@
 # plate (z < 0). TARGET_PID below is chosen by mesh geometry, asserted
 # before touching anything so a relabeling can't silently break this again.
 #
-# TI64 endpoint properties match examples/clad/clad.k and gradient_material.py.
+# TI64 endpoint properties match examples/clad/clad.k and gradient_material_discrete_bands_TI64_IN718.py.
 # Cu endpoint is a much more drastic thermal contrast than IN718 (~60x higher
 # conductivity, ~550K lower melting point) - used to make the composition
 # gradient's effect on temperature obvious, since the TI64-vs-IN718 pair (both
@@ -35,10 +35,10 @@
 # metallurgically realistic DED pairing - a numerical demo of the blending
 # mechanism, not a claim about real alloy compatibility.
 #
-# CAVEAT (same as gradient_material.py): blending is linear rule-of-mixtures
+# CAVEAT (same as gradient_material_discrete_bands_TI64_IN718.py): blending is linear rule-of-mixtures
 # by default - this script/format fixes the *quantization* problem (no more
 # discrete bands), not the *mixing-model* problem. Solidus/liquidus in
-# particular are still an approximation; see gradient_material.py's header
+# particular are still an approximation; see gradient_material_discrete_bands_TI64_IN718.py's header
 # for the full caveat.
 
 import os

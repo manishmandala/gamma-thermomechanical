@@ -1,6 +1,6 @@
 # Generates sol_100_control_graded.k - a control file that imports Rowan's
 # mesh (sol_100.vtu) via *EXTERNAL_MESH and applies HER OWN per-element
-# composition (not a synthetic function like gradient_material_continuous.py/
+# composition (not a synthetic function like gradient_material_continuous_TI64_IN718.py/
 # _cu.py use for the wall examples) as a *MAT_THERMAL_GRADED_TD /
 # *ELEMENT_COMPOSITION blend.
 #

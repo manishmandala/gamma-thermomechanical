@@ -4,8 +4,8 @@
 # committed BEFORE the refactor, for every script that generates composition
 # data:
 #
-#   gradient_material_continuous.py     -> thinwall_graded.k    (TI64/IN718, sinusoidal)
-#   gradient_material_continuous_cu.py  -> thinwall_graded_cu.k (TI64/Cu, sinusoidal)
+#   gradient_material_continuous_TI64_IN718.py     -> thinwall_graded.k    (TI64/IN718, sinusoidal)
+#   gradient_material_continuous_TI64_Cu.py  -> thinwall_graded_cu.k (TI64/Cu, sinusoidal)
 #   prepare_composition.py              -> the 4 endpoint-validation .k decks (constant mode)
 #
 # "Byte-identical to git HEAD" is a strong, unambiguous baseline: it doesn't
@@ -88,8 +88,8 @@ def check_prepare_composition(dataset_rel, kfile, mode):
                          '{} differs from git HEAD'.format(mode)))
 
 
-check_generator_script('gradient_material_continuous.py', 'thinwall_graded.k')
-check_generator_script('gradient_material_continuous_cu.py', 'thinwall_graded_cu.k')
+check_generator_script('gradient_material_continuous_TI64_IN718.py', 'thinwall_graded.k')
+check_generator_script('gradient_material_continuous_TI64_Cu.py', 'thinwall_graded_cu.k')
 
 for mode in ('pure_inconel', 'pure_titanium', 'constant_inconel', 'constant_titanium'):
     check_prepare_composition('../incoming_dataset/part002_LP800_SSp10_H2.24_SSt3_LH0.9', '2.k', mode)

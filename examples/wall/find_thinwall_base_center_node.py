@@ -1,3 +1,7 @@
+# One-off utility: finds the node ID closest to the center of the wall
+# demo's substrate base (z=-4.0 plane) in thinwall.k, for use as a
+# --log-node target or manual sanity check. Not part of any pipeline.
+
 import cupy as cp
 import numpy as np
 from gamma.simulator.gamma import domain_mgr

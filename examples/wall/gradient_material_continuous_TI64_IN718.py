@@ -8,12 +8,12 @@
 # *MAT_THERMAL_GRADED_TD / *ELEMENT_COMPOSITION handling in
 # src/gamma/simulator/gamma.py) - this script only writes the composition
 # field, it does not pre-blend curves or bake discrete materials the way
-# gradient_material.py (the 70-band predecessor) does. No fixed step count:
+# gradient_material_discrete_bands_TI64_IN718.py (the 70-band predecessor) does. No fixed step count:
 # however many wall elements the mesh has, that's how many distinct
 # compositions you get - nothing needs to divide evenly into anything.
 #
 # Reads thinwall_clean.k - the pre-gradient mesh (2 plain TI64 materials,
-# matches commit 3776a6d's thinwall.k before gradient_material.py ever ran) -
+# matches commit 3776a6d's thinwall.k before gradient_material_discrete_bands_TI64_IN718.py ever ran) -
 # not the committed 70-band thinwall.k, and writes to a separate output file
 # so both variants stay available for comparison.
 #
@@ -28,12 +28,12 @@
 # before touching anything so a relabeling can't silently break this again.
 #
 # TI64/IN718 endpoint properties and curve files match examples/clad/clad.k
-# and gradient_material.py - reused as-is, no new curve files needed.
+# and gradient_material_discrete_bands_TI64_IN718.py - reused as-is, no new curve files needed.
 #
-# CAVEAT (same as gradient_material.py): blending is linear rule-of-mixtures
+# CAVEAT (same as gradient_material_discrete_bands_TI64_IN718.py): blending is linear rule-of-mixtures
 # by default - this script/format fixes the *quantization* problem (no more
 # discrete bands), not the *mixing-model* problem. Solidus/liquidus in
-# particular are still an approximation; see gradient_material.py's header
+# particular are still an approximation; see gradient_material_discrete_bands_TI64_IN718.py's header
 # for the full caveat.
 
 import os

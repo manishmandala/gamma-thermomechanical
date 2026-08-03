@@ -1,6 +1,6 @@
 # Recomputes element birth (activation) times to match the current
 # toolpath.crs and rewrites thinwall.k's *DEFINE_CURVE block in place.
-# Run this any time gen_toolpath.py's schedule changes (SWEEP/DWELL/Z0/
+# Run this any time generate_thinwall_demo_toolpath.py's schedule changes (SWEEP/DWELL/Z0/
 # LAYER_DZ/N_PASSES/Y_CENTER) - the mesh geometry itself is untouched.
 #
 # RADIUS must be wide enough for a single centered pass (Y_CENTER=0.0) to

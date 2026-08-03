@@ -82,7 +82,7 @@ Created (examples/wall/):
   - generate_raster_toolpath.py   (reusable synthetic boustrophedon generator)
   - build_synthetic_deck.py       (assign_birth_time + deck assembly, mesh unchanged)
   - validate_synthetic_toolpath.py (toolpath/birth/mesh validation, 7 checks)
-  - make_gradient_comparison_figure_pilot.py
+  - make_gradient_comparison_figure_hatch_pilot_h1.12.py
 
 Modified (examples/wall/):
   - run_wall.py   (bug fix: --toolpath now joined with --input-data-dir; see above)

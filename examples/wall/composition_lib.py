@@ -1,6 +1,6 @@
 # Shared composition-generation engine, used by every script that computes
-# a per-element *ELEMENT_COMPOSITION fraction (gradient_material_continuous.py,
-# gradient_material_continuous_cu.py, prepare_composition.py). Three
+# a per-element *ELEMENT_COMPOSITION fraction (gradient_material_continuous_TI64_IN718.py,
+# gradient_material_continuous_TI64_Cu.py, prepare_composition.py). Three
 # deliberately separate stages, matching the target architecture agreed on
 # for the curved-path (toolpath-arc-length) composition work:
 #
@@ -19,7 +19,7 @@
 #
 # REGRESSION-CRITICAL: coordinate_function's global_x/global_y/global_z
 # behavior and every function in COMPOSITION_PRESETS must stay byte-for-byte
-# equivalent to what gradient_material_continuous.py computed inline before
+# equivalent to what gradient_material_continuous_TI64_IN718.py computed inline before
 # this refactor - see test_composition_regression.py, which proves this
 # against the actual committed thinwall_graded.k/thinwall_graded_cu.k output.
 
@@ -180,7 +180,7 @@ def coordinate_function(centroid, mode, bounds=None, toolpath=None, toolpath_arc
 
     mode='global_x' | 'global_y' | 'global_z': linear position along that
     global axis, normalized against `bounds` (see compute_bounds). Exactly
-    what gradient_material_continuous.py's inline
+    what gradient_material_continuous_TI64_IN718.py's inline
     `(cx - x_min) / (x_max - x_min)` computed before this module existed.
 
     mode='toolpath_arc_length': normalized distance traveled along the
@@ -230,7 +230,7 @@ def coordinate_function(centroid, mode, bounds=None, toolpath=None, toolpath_arc
 
 
 # ---- composition presets ----------------------------------------------
-# Ported verbatim (same math, same defaults) from gradient_material_continuous.py.
+# Ported verbatim (same math, same defaults) from gradient_material_continuous_TI64_IN718.py.
 # x_norm/z_norm follow that script's original convention: x_norm runs 0 (first
 # endpoint material) -> 1 (second); z_norm is a second, independent axis that
 # only `sinusoidal` actually uses - every preset shares one call signature so
@@ -244,7 +244,7 @@ def linear(x_norm, z_norm=0.0):
 
 def sinusoidal(x_norm, z_norm=0.0, cycles_x=4.0, cycles_z=1.5):
     # additive x-wave + z-wave, not multiplicative - see
-    # gradient_material_continuous.py's original header note for why
+    # gradient_material_continuous_TI64_IN718.py's original header note for why
     # (a product term lets z's factor silently suppress x's variation).
     return 0.5 + 0.25 * np.sin(2*np.pi * cycles_x * x_norm) + 0.25 * np.sin(2*np.pi * cycles_z * z_norm)
 
