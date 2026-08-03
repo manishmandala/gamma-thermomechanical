@@ -117,3 +117,42 @@ examples/wall/generate_parameter_sweep.py, run_parameter_sweep.py,
 analyze_parameter_sweep.py - see prior report version for details. The
 critical fix this round was entirely in run_wall.py's toolpath-path
 resolution, not in any of the sweep-specific scripts.
+
+----------------------------------------------------------------------
+ADDENDUM (2026-08-01): explanation for the 1200W non-monotonic dip
+----------------------------------------------------------------------
+Investigated using already-computed frames (no new simulation - a repeat
+run of a deterministic solver would not have told us anything new, since
+identical inputs produce identical outputs). Checked, for every power
+level, whether the recorded transient max|dT| occurred mid-run (a complete
+rise-then-decline cycle was captured within the 119s/15%-depth window) or
+right at the final frame (the event was still rising when the window
+closed, i.e. the TRUE peak was not captured):
+
+  LP400:  peaked at t=23.8s,  then declined  -> complete cycle captured
+  LP600:  peaked at t=65.5s,  then declined  -> complete cycle captured
+  LP800:  STILL RISING at t=119.1s (final frame) -> true peak NOT captured
+  LP1000: peaked at t=44.6s,  then declined  -> complete cycle captured
+  LP1200: STILL RISING at t=119.1s (final frame) -> true peak NOT captured
+
+This is very likely the explanation for the apparent dip at 1200W: 800W and
+1200W are the only two sweep values whose composition-driven divergence
+event had not finished rising by the fixed 15%-depth cutoff, so their
+recorded "transient max" is a lower bound on the true peak, not the true
+peak itself. 1000W's recorded value (490K) is a genuine, complete peak;
+1200W's (432K) is a truncated, still-rising value that may well exceed
+490K if the run continued further. Under this explanation, the dip is a
+measurement-window artifact, not a real reversal in the underlying power-
+sensitivity relationship - the true relationship may be monotonically
+increasing throughout, consistent with the general trend seen in 400/600/
+1000W's complete-cycle values.
+
+This is a real methodological finding worth stating plainly: transient
+max|dT| computed over a FIXED stop-fraction window is only a reliable
+comparison metric across sweep values when every value's event completes
+within that window. It did not for 2 of 5 values here. A future rerun
+extending 800W and 1200W (or all values, for consistency) to a longer
+stop-fraction - not a repeat of the same window - would resolve this
+properly. Not done here, per the decision to close out this phase of the
+project rather than keep extending it; noted as the correct follow-up
+if this specific question is revisited.

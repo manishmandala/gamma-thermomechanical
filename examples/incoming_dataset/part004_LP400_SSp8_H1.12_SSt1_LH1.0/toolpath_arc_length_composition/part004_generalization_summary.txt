@@ -1,3 +1,43 @@
+=============================================================================
+SUPERSEDED NOTICE (added 2026-08-01) - READ BEFORE USING ANY NUMBER BELOW
+=============================================================================
+The Stage 2 thermal-validation numbers in this report (peak temperatures,
+transient/final max|dT|, all numbers under "STAGE 2: matched 15%-depth
+thermal comparison") are INVALID. They were produced by a run_wall.py bug
+(--toolpath never joined with --input-data-dir) that caused this run to
+silently use examples/wall/toolpath.crs - the wall demo's own 38-second
+toolpath - instead of part004's real ~800-second toolpath, for its entire
+15%-depth window. Full details: see examples/wall/run_wall.py's fix commit
+(26e9706) and the corrected power-sweep report at
+../power_sweep/power_sweep_report.txt.
+
+The CORRECTED equivalent of this dataset's 15%-depth, 400W thermal
+validation is the 400W arm of the corrected power sweep (commit 3880bad):
+  peak T (arc/gx): 2629.4K / 2410.4K   (vs. this report's invalid 1072.9K/1086.2K)
+  transient max|dT|: 218.97K            (vs. this report's invalid 24.79K)
+  final-frame max|dT|: 149.17K          (vs. this report's invalid 0.0040K)
+See ../power_sweep/analysis/parameter_sweep_summary.csv for the full table.
+
+Separately, this report's toolpath characterization ("23 near-180-degree
+reversals, 24 line passes across 16 z-layers, ~1.5 passes/layer") was also
+later found to be wrong (a bug in an earlier direction-reversal-based pass
+counter). The real toolpath is a genuine dense raster: 17 tracks/layer at
+exactly 1.12mm hatch spacing, across 8 real z-levels (not 16 - "16" there
+meant mesh element z-sublayers, 2 per deposited layer, not toolpath passes).
+See examples/wall/generate_raster_toolpath.py's docstring and the
+hatch-spacing pilot report (examples/incoming_dataset/part004_.../
+hatch_spacing_study/pilot_h1.12/pilot_report.txt) for the corrected
+measurement.
+
+STAGE 1 (composition diagnostics) below is UNAFFECTED by either issue -
+diagnose_composition_mapping.py always resolves its toolpath path correctly
+(joins --dataset and --toolpath explicitly), and the seam-rate root-cause
+analysis (toolpath-resolution vs. layer count) remains valid even though
+the specific "24 passes" toolpath description was imprecise - the underlying
+mechanism (coarse-relative-to-layer-count arc-length jumps) still holds,
+just described with the wrong pass count.
+=============================================================================
+
 part004 generalization test - summary and three-way comparison
 (part002 vs part005 vs part004)
 ================================================================
