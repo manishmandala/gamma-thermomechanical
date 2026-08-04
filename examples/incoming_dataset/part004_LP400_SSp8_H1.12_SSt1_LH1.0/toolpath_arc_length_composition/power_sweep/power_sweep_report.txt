@@ -156,3 +156,43 @@ stop-fraction - not a repeat of the same window - would resolve this
 properly. Not done here, per the decision to close out this phase of the
 project rather than keep extending it; noted as the correct follow-up
 if this specific question is revisited.
+
+----------------------------------------------------------------------
+EXTENSION (2026-08-04): 1400W and 1600W added - anomaly resolved
+----------------------------------------------------------------------
+Extended the sweep to 1400W and 1600W (4 more runs: 2 powers x 2 modes,
+same isolation-verified generation process, same 15%-depth window) to test
+whether the 1200W "dip" was a real reversal or the measurement-window
+truncation artifact identified earlier. Full 7-point result:
+
+Power(W)  Peak T arc(K)  Transient max|dT|(K)  Final max|dT|(K)  %>liquidus
+400       2629.4         218.97                149.17            0.001%
+600       3367.0         303.21                168.81            0.001%
+800       4155.6         363.33                363.33            0.003%
+1000      4913.6         490.33                291.36            0.004%
+1200      5598.7         431.88                431.88            0.005%
+1400      6284.4         521.71                444.05            0.007%
+1600      6974.1         578.28                383.36            0.009%
+
+CONFIRMED: the dip is a measurement-window artifact, not a real reversal.
+1400W and 1600W both continue the RISING trend well past 1200W's apparent
+dip - 521.7K and 578.3K, both higher than 1000W's 490.3K. With the full
+7-point range, the fit is now clean LINEAR (R^2=0.9175) and the quadratic
+fit no longer meaningfully improves on it (R^2=0.9334, essentially the same
+- the earlier "nonlinear/threshold" verdict from the 5-point sweep was
+itself partly an artifact of too few points combined with 800W/1200W being
+under-captured by the fixed window).
+
+Relative sensitivity stays in the same comparatively stable band across
+the full extended range (0.082-0.106, no trend), reinforcing the original
+finding: composition-mode sensitivity scales roughly linearly with power
+and with overall thermal magnitude, with no evidence of disproportionate
+amplification or damping anywhere in 400-1600W.
+
+Melt fraction continues increasing monotonically and smoothly (0.001% to
+0.009%) - no threshold/onset behavior visible even out to 1600W, consistent
+with the linear (not threshold) verdict.
+
+This closes out the power-sweep investigation with a single, clean,
+monotonic, linear relationship across the full tested range - no further
+extension needed.

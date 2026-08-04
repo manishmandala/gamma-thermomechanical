@@ -1,21 +1,21 @@
-Parameter sweep scaling analysis (5 values: [400.0, 600.0, 800.0, 1000.0, 1200.0])
+Parameter sweep scaling analysis (7 values: [400.0, 600.0, 800.0, 1000.0, 1200.0, 1400.0, 1600.0])
 ======================================================================
 
 Transient max |dT| vs Laser Power (W):
-  values: {400.0: 218.96667949311814, 600.0: 303.2102973075189, 800.0: 363.3257583619054, 1000.0: 490.3341296625367, 1200.0: 431.88021236416125}
-  linear fit R^2  = 0.8300  (slope=0.30648, intercept=116.363)
-  quadratic fit R^2 = 0.9053
-  per-interval slopes: [0.42122, 0.30058, 0.63504, -0.29227]
-  max/mean interval-slope ratio: 1.54 (interval [800,1000])
-  verdict: NONLINEAR (quadratic fit substantially better than linear)
+  values: {400.0: 218.96667949311814, 600.0: 303.2102973075189, 800.0: 363.3257583619054, 1000.0: 490.3341296625367, 1200.0: 431.88021236416125, 1400.0: 521.7083635008644, 1600.0: 578.2842292421174}
+  linear fit R^2  = 0.9175  (slope=0.28277, intercept=132.619)
+  quadratic fit R^2 = 0.9334
+  per-interval slopes: [0.42122, 0.30058, 0.63504, -0.29227, 0.44914, 0.28288]
+  max/mean interval-slope ratio: 1.60 (interval [800,1000])
+  verdict: LINEAR (quadratic fit does not meaningfully improve R^2)
 
 
 Relative composition sensitivity (transient max |dT| / peak temperature rise above 300K):
-  {400.0: 0.094, 600.0: 0.09886, 800.0: 0.09423, 1000.0: 0.10628, 1200.0: 0.08151}
+  {400.0: 0.094, 600.0: 0.09886, 800.0: 0.09423, 1000.0: 0.10628, 1200.0: 0.08151, 1400.0: 0.08718, 1600.0: 0.08665}
   (flat/decreasing => composition sensitivity just tracks overall thermal magnitude;
    increasing => composition choice becomes disproportionately more important at higher Laser Power (W),
    e.g. because the two alloys phase-change at different temperatures)
 
 Melt-pool proxy (fraction of nodes > 1609K, i.e. above liquidus):
-  {400.0: 0.0008, 600.0: 0.0012, 800.0: 0.0029, 1000.0: 0.0039, 1200.0: 0.0053}
+  {400.0: 0.0008, 600.0: 0.0012, 800.0: 0.0029, 1000.0: 0.0039, 1200.0: 0.0053, 1400.0: 0.0073, 1600.0: 0.0095}
   melting present at all sweep values, or absent at all sweep values
