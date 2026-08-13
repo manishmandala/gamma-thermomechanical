@@ -1,15 +1,16 @@
-# Generates sol_100_control_graded.k - a control file that imports Rowan's
-# mesh (sol_100.vtu) via *EXTERNAL_MESH and applies HER OWN per-element
-# composition (not a synthetic function like gradient_material_continuous_TI64_IN718.py/
-# _cu.py use for the wall examples) as a *MAT_THERMAL_GRADED_TD /
-# *ELEMENT_COMPOSITION blend.
+# Generates sol_100_control_graded.k - a control file that imports the
+# externally-provided mesh (sol_100.vtu) via *EXTERNAL_MESH and applies its
+# OWN per-element composition (not a synthetic function like
+# gradient_material_continuous_TI64_IN718.py/_cu.py use for the wall
+# examples) as a *MAT_THERMAL_GRADED_TD / *ELEMENT_COMPOSITION blend.
 #
 # sol_100.vtu's cell_data['mat'] is a true 4-material composition simplex
 # (50336 elements x 4 fractions, each row sums to 1.0) - NOT a 2-material
 # blend. Per an old code comment from when this file was first explored
-# (main_external_mesh_test.py), the 4 columns are, in order: IN625, SS316,
-# HA25, MCrAlY. This ordering is INHERITED, not confirmed with Rowan herself
-# - flagged here so whoever revisits this knows it's an assumption.
+# (external_mesh_import_check.py), the 4 columns are, in order: IN625,
+# SS316, HA25, MCrAlY. This ordering is INHERITED, not confirmed with the
+# mesh's original author - flagged here so whoever revisits this knows it's
+# an assumption.
 #
 # Columns 0 and 1 (IN625, SS316) are the only ones that are ever the
 # dominant/argmax material for any element (verified: argmax is never 2 or 3,
@@ -29,8 +30,8 @@ import os
 import meshio
 import numpy as np
 
-MESH_FILE = 'sol_100.vtu'
-MESH_FILE_OUT = 'sol_100_control_graded.k'
+MESH_FILE = 'external_mesh/sol_100.vtu'
+MESH_FILE_OUT = 'external_mesh/sol_100_control_graded.k'
 PROP_DIR_IN718 = '../0_properties'
 PROP_DIR_1018 = '../data/materials'
 GRAD_ID = 201   # pid used for the (single) graded region; 1 is used by the pure-material control files
@@ -95,7 +96,7 @@ mat_block = (
 part_block = (
     '*PART\n'
     '$HWCOLOR COMPS     {}       5\n'.format(GRAD_ID) +
-    'Imported_Part_Graded_Rowan_Composition\n' +
+    'Imported_Part_Graded_ExternalMesh_Composition\n' +
     '      %5d         0     %5d\n' % (GRAD_ID, GRAD_ID)
 )
 

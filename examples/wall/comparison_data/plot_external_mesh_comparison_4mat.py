@@ -1,24 +1,25 @@
+# Plots the true 4-material external-mesh comparison (all 4 real composition
+# columns) alongside the original 2-material collapsed version and the pure
+# IN718/1018 controls.
+
 import glob
 
 import numpy as np
 import pyvista as pv
 import matplotlib.pyplot as plt
 
-# Validates that importing Rowan's mesh (sol_100.vtu) + her own per-element
-# composition actually drives real, per-location thermal behavior - not a
-# silent default to one material. There's no laser here (toolpath_off.crs),
-# so this is pure relaxation of a fixed initial T field toward ambient/
-# boundary conditions - peak temperature is fixed by the identical initial
-# condition across all 3 runs and isn't a useful metric (it can only
-# decrease). Instead: track temperature over time at 4 fixed probe nodes
-# (valid across all 3 runs since sort_birth=False preserves sol_100.vtu's
-# own node order), and a domain-wide relaxation curve.
+# Extends plot_external_mesh_comparison.py with the true 4-material graded
+# run (results/external_mesh_graded_4mat, using all 4 of the externally-
+# imported mesh's real composition columns via external_mesh_composition_4mat.py)
+# alongside the original 2-material collapsed graded run
+# (results/external_mesh_graded) and the two majority-material
+# pure controls (IN718, 1018). HA25/MCrAlY (proxied by CPTi/Al) are always
+# minor admixtures in this mesh (IN625+SS316 >= 65% everywhere), so IN718/1018
+# still bound the result even though their pure controls aren't included here.
 #
-# Probe nodes (computed once from sol_100.vtu itself - see the values below):
-#   node 6    - hottest initial point (T=800K)
-#   node 0    - coldest initial point (T=200K)
-#   node 1606 - inside the element with frac_B nearest 1 (SS316-proxy-dominant, frac_B=0.993)
-#   node 99   - inside the element with frac_B nearest 0 (IN625-proxy-dominant, frac_B=0.259)
+# Same setup as the original comparison: no laser (toolpath_off.crs), pure
+# relaxation of a fixed initial T field, sort_birth=False so node indices
+# mean the same physical location across every run.
 
 PROBES = {
     'Hottest (node 6, T0=800K)': 6,
@@ -28,9 +29,13 @@ PROBES = {
 }
 
 RUNS = [
-    ('IN718 (IN625 proxy)', '../results_rowan_IN718', '#2a78d6'),
-    ('1018 (SS316 proxy)', '../results_rowan_1018', '#eb6834'),
-    ('Graded (Rowan\'s composition)', '../results_rowan_graded', '#1baf7a'),
+    ('IN718 (IN625 proxy)', '../results/external_mesh_IN718', '#2a78d6'),
+    ('1018 (SS316 proxy)', '../results/external_mesh_1018', '#eb6834'),
+    ('Graded, 2-material (collapsed)', '../results/external_mesh_graded', '#1baf7a'),
+    # was '../results_rowan_graded_4mat' - a stale path that never existed
+    # (the actual run only ever had the post-dtfix name); fixed here as part
+    # of the results/ consolidation rather than left dangling.
+    ('Graded, 4-material (true composition)', '../results/external_mesh_graded_4mat', '#a83fd1'),
 ]
 
 data = {label: {probe: [] for probe in PROBES} for label, _, _ in RUNS}
@@ -61,10 +66,10 @@ for ax, probe in zip(axes.flat, PROBES):
     ax.grid(color='#dddddd', linewidth=1, zorder=0)
     ax.set_axisbelow(True)
 axes.flat[0].legend(fontsize=8, loc='upper right')
-fig.suptitle("Probe-node temperature over time: IN718 vs 1018 vs Rowan's graded mesh", fontsize=12)
+fig.suptitle("Probe-node temperature over time: IN718 vs 1018 vs 2-material vs 4-material graded", fontsize=12)
 fig.tight_layout()
-fig.savefig('rowan_mesh_probe_nodes.png', dpi=180)
-print('Saved rowan_mesh_probe_nodes.png')
+fig.savefig('external_mesh_probe_nodes_4mat.png', dpi=180)
+print('Saved external_mesh_probe_nodes_4mat.png')
 
 # --- domain-wide relaxation ---
 fig2, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
@@ -84,17 +89,19 @@ for ax in (ax1, ax2):
     ax.set_axisbelow(True)
 ax1.legend(fontsize=8)
 fig2.tight_layout()
-fig2.savefig('rowan_mesh_relaxation.png', dpi=180)
-print('Saved rowan_mesh_relaxation.png')
+fig2.savefig('external_mesh_relaxation_4mat.png', dpi=180)
+print('Saved external_mesh_relaxation_4mat.png')
 
-# --- printed summary: does graded sit between the two pure endpoints at every probe? ---
+# --- printed summary: does each graded variant sit between the two majority endpoints? ---
 print()
 for probe in PROBES:
     vals_at_end = {label: data[label][probe][-1][1] for label, _, _ in RUNS}
     lo = min(vals_at_end['IN718 (IN625 proxy)'], vals_at_end['1018 (SS316 proxy)'])
     hi = max(vals_at_end['IN718 (IN625 proxy)'], vals_at_end['1018 (SS316 proxy)'])
-    graded = vals_at_end["Graded (Rowan's composition)"]
-    between = lo <= graded <= hi
+    g2 = vals_at_end['Graded, 2-material (collapsed)']
+    g4 = vals_at_end['Graded, 4-material (true composition)']
     print(f'{probe}: final T - IN718={vals_at_end["IN718 (IN625 proxy)"]:.1f}K, '
-          f'1018={vals_at_end["1018 (SS316 proxy)"]:.1f}K, graded={graded:.1f}K, '
-          f'graded between endpoints: {between}')
+          f'1018={vals_at_end["1018 (SS316 proxy)"]:.1f}K, '
+          f'2-mat graded={g2:.1f}K (between: {lo <= g2 <= hi}), '
+          f'4-mat graded={g4:.1f}K (between: {lo <= g4 <= hi}), '
+          f'delta 4mat-2mat={g4-g2:+.2f}K')

@@ -26,7 +26,7 @@
 # WHICH material ID is "the build region" is determined by BIRTH TIME, not
 # by the file's own *PART names - this project has already hit this exact
 # trap once before (see gradient_material_continuous_TI64_Cu.py's header note on
-# thinwall.k) and it recurred independently on the new OneDrive datasets
+# thinwall_discrete_bands.k) and it recurred independently on the new OneDrive datasets
 # (part002's *PART block calls pid 1 "Substrate" and pid 2 "Build", but pid
 # 1 is the one with real, progressive birth times - i.e. actually the
 # deposited region - and pid 2 is birth=0 everywhere - i.e. actually the
@@ -45,7 +45,8 @@ import cupy as cp
 cp.cuda.Device(0).use()
 from gamma.simulator.gamma import domain_mgr, load_toolpath
 from composition_lib import (compute_centroid, compute_bounds, coordinate_function,
-                              composition_function, COORDINATE_MODES, COMPOSITION_PRESETS)
+                              composition_function, filter_deposit_segments,
+                              COORDINATE_MODES, COMPOSITION_PRESETS)
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--dataset', required=True, help='dataset folder, e.g. ../incoming_dataset/part002_.../')
@@ -57,6 +58,18 @@ parser.add_argument('--mode', required=True,
                      choices=['pure_inconel', 'pure_titanium', 'constant_inconel', 'constant_titanium', 'graded'])
 parser.add_argument('--coordinate-mode', choices=COORDINATE_MODES,
                      help='required for --mode graded: {}'.format(COORDINATE_MODES))
+parser.add_argument('--local-normalize', action='store_true',
+                     help='only meaningful with --coordinate-mode toolpath_arc_length. By default, s is '
+                          'normalized against the FULL toolpath\'s total arc length (0=very start of the '
+                          'toolpath file, 1=very end) - if this dataset\'s build region only occupies part '
+                          'of that toolpath (e.g. other parts share the same file, or there are travel-only '
+                          'passes before/after), the build region\'s own s range will fall short of [0,1], '
+                          'so a preset like quadratic/sigmoid that expects to hit its true 0/1 endpoints '
+                          'exactly won\'t. Pass this flag to instead rescale s so 0/1 map to the build '
+                          'region\'s own observed min/max s - i.e. "start/end of THIS part", matching how '
+                          'global_x/y/z already normalize locally via compute_bounds. Off by default to '
+                          'keep existing toolpath_arc_length output (part001-005\'s sinusoidal decks) '
+                          'unchanged.')
 parser.add_argument('--composition-mode', choices=sorted(COMPOSITION_PRESETS),
                      help='required for --mode graded: {}'.format(sorted(COMPOSITION_PRESETS)))
 parser.add_argument('--out', required=True, help='output .k path - must not already exist')
@@ -160,8 +173,14 @@ else:  # constant_inconel / constant_titanium / graded
     else:  # graded
         centroids = np.array([compute_centroid(nodes, build_element_node_ids[eid]) for eid in build_element_ids])
         if args.coordinate_mode == 'toolpath_arc_length':
-            toolpath_xyz = load_toolpath(os.path.join(args.dataset, args.toolpath))[:, 1:4]
+            toolpath_raw = load_toolpath(os.path.join(args.dataset, args.toolpath))
+            toolpath_xyz = filter_deposit_segments(toolpath_raw[:, 1:4], toolpath_raw[:, 4])
             s = coordinate_function(centroids, args.coordinate_mode, toolpath=toolpath_xyz)
+            if args.local_normalize:
+                s_lo, s_hi = float(s.min()), float(s.max())
+                print('--local-normalize: build region occupies global s=[{:.4f}, {:.4f}] of the full '
+                      'toolpath - rescaling to [0, 1] for this part'.format(s_lo, s_hi))
+                s = (s - s_lo) / (s_hi - s_lo) if s_hi > s_lo else np.zeros_like(s)
         else:
             bounds = compute_bounds(centroids)
             s = coordinate_function(centroids, args.coordinate_mode, bounds=bounds)

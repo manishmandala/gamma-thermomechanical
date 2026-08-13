@@ -1,12 +1,11 @@
 # Parameterized runner for *EXTERNAL_MESH control files - takes the control
 # file and output folder as CLI args instead of hand-copying a new .py file
-# per material (see legacy_main_wall_pure_TI64.py/pure_IN718.py/pure_Cu.py - flagged as tech debt;
-# this is the fix for that pattern going forward). Generalizes
-# main_external_mesh_test.py's logic (left untouched as a reference example)
-# so pure-IN718, pure-1018, and graded runs on Rowan's mesh all share one
-# script.
+# per material. Generalizes external_mesh_import_check.py's logic (left
+# untouched as a reference example) so pure-IN718, pure-1018, and graded
+# runs on the externally-imported mesh (sol_100.vtu) all share one script.
 #
-# Usage: python3 run_external_mesh.py <control_file> <output_dir>
+# Usage (from examples/wall): python3 external_mesh/run_external_mesh.py <control_file> <output_dir>
+# e.g. python3 external_mesh/run_external_mesh.py external_mesh/sol_100_control_IN718.k results/external_mesh_IN718
 
 import sys
 import os
@@ -21,7 +20,7 @@ import meshio
 
 CONTROL_FILE = sys.argv[1]
 OUTPUT_DIR = sys.argv[2]
-SOURCE_MESH = 'sol_100.vtu'   # provides the initial T field - same for every run, so material is the only variable
+SOURCE_MESH = 'external_mesh/sol_100.vtu'   # provides the initial T field - same for every run, so material is the only variable
 STOP_TIME = 5.0
 N_FRAMES = 40
 

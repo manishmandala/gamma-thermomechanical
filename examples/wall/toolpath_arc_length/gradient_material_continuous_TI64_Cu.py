@@ -1,4 +1,4 @@
-# Grades the DEPOSITED WALL (laser-built material) as a CONTINUOUS TI64/IN718
+# Grades the DEPOSITED WALL (laser-built material) as a CONTINUOUS TI64/Cu
 # blend across the wall's x-z face (travel direction and build height) - one
 # composition value per element (not per discrete band), evaluated at that
 # element's own centroid via composition_lib.py's coordinate_function ->
@@ -14,21 +14,26 @@
 #
 # Reads thinwall_clean.k - the pre-gradient mesh (2 plain TI64 materials,
 # matches commit 3776a6d's thinwall.k before gradient_material_discrete_bands_TI64_IN718.py ever ran) -
-# not the committed 70-band thinwall.k, and writes to a separate output file
-# so both variants stay available for comparison.
+# not the committed 70-band thinwall_discrete_bands.k (renamed from thinwall.k),
+# and writes to a separate output file so both variants stay available for comparison.
 #
 # Only touches the *ELEMENT_SOLID pid column and adds *MAT_THERMAL_GRADED_TD
 # / *ELEMENT_COMPOSITION blocks - node geometry, birth times, and the
 # toolpath are untouched, so the laser schedule is unaffected.
 #
-# NOTE: thinwall.k's *PART block names are misleading - the part LABELED
+# NOTE: thinwall_discrete_bands.k's *PART block names are misleading - the part LABELED
 # "Substrate" (pid 1) is actually the above-ground deposited wall (z > 0),
 # and the part labeled "Build" (pid 2) is actually the below-ground base
 # plate (z < 0). TARGET_PID below is chosen by mesh geometry, asserted
 # before touching anything so a relabeling can't silently break this again.
 #
-# TI64/IN718 endpoint properties and curve files match examples/clad/clad.k
-# and gradient_material_discrete_bands_TI64_IN718.py - reused as-is, no new curve files needed.
+# TI64 endpoint properties match examples/clad/clad.k and gradient_material_discrete_bands_TI64_IN718.py.
+# Cu endpoint is a much more drastic thermal contrast than IN718 (~60x higher
+# conductivity, ~550K lower melting point) - used to make the composition
+# gradient's effect on temperature obvious, since the TI64-vs-IN718 pair (both
+# poor conductors, similar melting points) barely differed. Not a
+# metallurgically realistic DED pairing - a numerical demo of the blending
+# mechanism, not a claim about real alloy compatibility.
 #
 # CAVEAT (same as gradient_material_discrete_bands_TI64_IN718.py): blending is linear rule-of-mixtures
 # by default - this script/format fixes the *quantization* problem (no more
@@ -37,26 +42,29 @@
 # for the full caveat.
 
 import os
+import sys
 import numpy as np
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from composition_lib import compute_centroid, compute_bounds, coordinate_function, composition_function
 
-MESH_FILE_IN = 'thinwall_clean.k'    # pre-gradient mesh (2 plain materials)
-MESH_FILE_OUT = 'thinwall_graded.k'  # new file; thinwall.k (70-band) is left untouched
+MESH_FILE_IN = 'thinwall_clean.k'        # pre-gradient mesh (2 plain materials)
+MESH_FILE_OUT = 'thinwall_graded_cu.k'   # new file; thinwall_graded.k (TI64/IN718) is left untouched
 PROP_DIR = '../0_properties'
 TARGET_PID = 1   # the deposited wall (despite the *PART block calling it "Substrate")
 BASE_PLATE_PID_OLD = 2
-GRAD_ID = 101     # pid used for graded wall elements; must not collide with any ordinary matID in the file
+GRAD_ID = 102     # pid used for graded wall elements; 101 is already taken by the TI64/IN718 variant
 
 TI64 = dict(density=0.00440, solidus=1878, liquidus=1928, latent=286,
             cp=os.path.join(PROP_DIR, 'TI64_cp.txt'),
             cond=os.path.join(PROP_DIR, 'TI64_cond.txt'))
-IN718 = dict(density=0.00819, solidus=1533, liquidus=1609, latent=270,
-             cp=os.path.join(PROP_DIR, 'IN718_cp.txt'),
-             cond=os.path.join(PROP_DIR, 'IN718_cond.txt'))
+Cu = dict(density=0.00896, solidus=1353, liquidus=1358, latent=205,
+          cp=os.path.join(PROP_DIR, 'Cu_cp.txt'),
+          cond=os.path.join(PROP_DIR, 'Cu_cond.txt'))
 
 
-# ---- composition profile: fraction of IN718 as a function of normalized
-# position ---- x_norm runs 0 (TI64 end of the wall) -> 1 (IN718 end) along
+# ---- composition profile: fraction of Cu as a function of normalized
+# position ---- x_norm runs 0 (TI64 end of the wall) -> 1 (Cu end) along
 # the build/travel direction (sideways); z_norm runs 0 -> 1 up the build
 # height (40 deposited layers, z = 0.05 .. 3.95, upwards). The coordinate
 # generation (centroid -> normalized x_norm/z_norm) and the profile itself
@@ -155,14 +163,14 @@ part_start = next(i for i, l in enumerate(lines) if l.startswith('*PART'))
 # followed by one (Cp_file, Cond_file) line pair per material.
 new_mat_lines = [
     '*MAT_THERMAL_GRADED_TD\n',
-    '$HMNAME MATS     {}GRADED_TI64_IN718\n'.format(GRAD_ID),
+    '$HMNAME MATS     {}GRADED_TI64_CU\n'.format(GRAD_ID),
     '      %5d   %5d   %.5f   %.1f   %.1f   %.1f   %.5f   %.1f   %.1f   %.1f\n' % (
         GRAD_ID, 2, TI64['density'], TI64['solidus'], TI64['liquidus'], TI64['latent'],
-        IN718['density'], IN718['solidus'], IN718['liquidus'], IN718['latent']),
+        Cu['density'], Cu['solidus'], Cu['liquidus'], Cu['latent']),
     TI64['cp'] + '\n',
     TI64['cond'] + '\n',
-    IN718['cp'] + '\n',
-    IN718['cond'] + '\n',
+    Cu['cp'] + '\n',
+    Cu['cond'] + '\n',
 ]
 lines = lines[:mat_first_end] + new_mat_lines + lines[mat_first_end:]
 
@@ -170,7 +178,7 @@ lines = lines[:mat_first_end] + new_mat_lines + lines[mat_first_end:]
 part_end = next(i for i in range(part_start + 1, len(lines)) if lines[i].startswith('*'))
 new_part_lines = [
     '$HWCOLOR COMPS     {}       5\n'.format(GRAD_ID),
-    'Wall_Graded_TI64_IN718\n',
+    'Wall_Graded_TI64_CU\n',
     '      %5d         0     %5d\n' % (GRAD_ID, GRAD_ID),
 ]
 lines = lines[:part_end] + new_part_lines + lines[part_end:]

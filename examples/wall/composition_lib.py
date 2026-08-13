@@ -78,6 +78,59 @@ def build_toolpath_arc_length_table(toolpath_xyz):
     return np.concatenate([[0.0], np.cumsum(seglen)])
 
 
+def filter_deposit_segments(toolpath_xyz, state):
+    """Reduces a raw toolpath down to only the segments where material was
+    actually being deposited, dropping travel/repositioning moves.
+
+    toolpath_xyz: (N,3) waypoints. state: (N,) array, this project's .crs
+    convention - state[i]==1 means the segment ENDING at waypoint i (i.e.
+    toolpath_xyz[i-1] -> toolpath_xyz[i]) was a deposit move with the laser
+    on; state[i]==0 means it was a travel move (laser off) - repositioning
+    between passes, or the end-of-build return to a park position.
+
+    Why this matters for project_to_toolpath: its nearest-segment search
+    has no notion of "deposit" vs "travel" - every segment is a candidate,
+    travel moves included. On a layer-by-layer raster build this is a real
+    problem: travel segments include the vertical reposition between each
+    layer, and - critically - a single end-of-build "return to origin" move
+    that can span the ENTIRE build height in one segment sitting right at
+    the raster's edge. Any element near that X position, at ANY layer, can
+    end up geometrically closer to that one all-heights-spanning travel
+    segment than to its own layer's actual deposit pass, snapping its
+    arc-length coordinate to nonsense (confirmed on examples/wall's own
+    raster toolpath.crs: elements 0.4mm apart at the same layer computed
+    arc-length coordinates 0.29 apart, because one of them matched the
+    end-of-build travel segment instead of its own layer's pass - see
+    project memory). Restricting the search to deposit-only segments fixes
+    this at the source instead of trying to special-case travel segments
+    inside the search itself.
+
+    Returns an (M,3) array (M <= N) of exactly the waypoints that are an
+    endpoint of at least one deposit segment, in original order - directly
+    usable with build_toolpath_arc_length_table / project_to_toolpath /
+    coordinate_function exactly like a raw toolpath array (two consecutive
+    deposit passes that aren't adjacent in the original array become
+    directly connected here, which is correct: that connecting distance is
+    real distance traveled between two deposits, just not itself a deposit).
+    Raises ValueError if no deposit segments exist at all.
+    """
+    toolpath_xyz = np.asarray(toolpath_xyz, dtype=float)
+    state = np.asarray(state)
+    if len(state) != len(toolpath_xyz):
+        raise ValueError("state length ({}) doesn't match toolpath_xyz ({})".format(
+            len(state), len(toolpath_xyz)))
+    if len(toolpath_xyz) < 2:
+        raise ValueError("filter_deposit_segments needs at least 2 toolpath points, got {}".format(
+            len(toolpath_xyz)))
+    deposit_end = (state[1:] == 1)   # (N-1,) - True where segment i->i+1 is a deposit move
+    if not deposit_end.any():
+        raise ValueError("filter_deposit_segments: no deposit (state==1) segments found in toolpath")
+    keep = np.zeros(len(toolpath_xyz), dtype=bool)
+    keep[:-1] |= deposit_end   # start point of each deposit segment
+    keep[1:] |= deposit_end    # end point of each deposit segment
+    return toolpath_xyz[keep]
+
+
 def project_to_toolpath(centroids, toolpath_xyz, cumulative_arc_length, chunk_size=2000, return_segment=False):
     """Projects each centroid onto the closest point on the toolpath's
     polyline - nearest SEGMENT, not nearest waypoint (see this module's
@@ -265,13 +318,26 @@ def constant(x_norm=0.0, z_norm=0.0, value=0.5):
     return value
 
 
+def quadratic(x_norm, z_norm=0.0, strength=1.0):
+    """Symmetric parabola: 1.0 (fully material A) at both ends (x_norm=0
+    and x_norm=1), dipping to (1-strength) at the midpoint, with a smooth
+    (continuous, differentiable) gradient in between - not a step change.
+    strength=1.0 -> pure material B at the midpoint; smaller strength ->
+    a shallower dip. Intended for a "reinforced ends, weak middle" stress-
+    test composition (e.g. --coordinate-mode global_x on a wall, so the two
+    physical tips of the build are one material and the center is graded
+    toward the other)."""
+    return 1.0 - strength * 4 * x_norm * (1 - x_norm)
+
+
 COMPOSITION_PRESETS = {
     'linear': linear,
     'sinusoidal': sinusoidal,
     'step': step,
     'sigmoid': sigmoid,
     'constant': constant,
-    # 'quadratic', 'piecewise' - planned, deliberately not implemented yet
+    'quadratic': quadratic,
+    # 'piecewise' - planned, deliberately not implemented yet
 }
 
 

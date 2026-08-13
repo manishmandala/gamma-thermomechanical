@@ -6,8 +6,13 @@
 # test_composition_regression.py after any change here, since this module
 # is shared with the position-dependent wall-example generators.
 
+import os
+import sys
 import numpy as np
-from composition_lib import build_toolpath_arc_length_table, project_to_toolpath, coordinate_function
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from composition_lib import (build_toolpath_arc_length_table, project_to_toolpath, coordinate_function,
+                              filter_deposit_segments)
 
 results = []
 
@@ -131,6 +136,54 @@ s_default = coordinate_function(probes, 'toolpath_arc_length', toolpath=circle, 
 s_tiny_chunks = coordinate_function(probes, 'toolpath_arc_length', toolpath=circle, chunk_size=1)
 check('chunk_size does not affect results', np.allclose(s_default, s_tiny_chunks),
       'default={} tiny={}'.format(s_default, s_tiny_chunks))
+
+# ---- 10. raster/self-folding path: travel segments must not win the search ----
+# Reproduces examples/wall's own toolpath.crs structure: 3 deposit layers
+# (state=1) 0.2 apart in Z, connected by travel moves (state=0), PLUS an
+# end-of-build "return to origin" travel move that spans the entire Z range
+# in one segment sitting right at the raster's edge (x=7) - this is exactly
+# the segment that hijacked project_to_toolpath's nearest-segment search
+# before filter_deposit_segments existed (see that function's docstring).
+raster = np.array([
+    [-7, 0, 0.0],                  # 0: start position
+    [-7, 0, 0.2], [7, 0, 0.2],     # 1-2: travel up, then deposit layer 0 (state 0,1)
+    [7, 0, 0.4], [-7, 0, 0.4],     # 3-4: travel up, then deposit layer 1 (state 0,1)
+    [-7, 0, 0.6], [7, 0, 0.6],     # 5-6: travel up, then deposit layer 2 (state 0,1)
+    [7, 0, 0.0],                   # 7: end-of-build return to origin (state 0) -
+    #    a single travel segment spanning the ENTIRE Z range (0.6 -> 0.0),
+    #    sitting exactly at x=7 where the last layer's pass also ends.
+], dtype=float)
+raster_state = np.array([0, 0, 1, 0, 1, 0, 1, 0])
+
+filtered = filter_deposit_segments(raster, raster_state)
+check('raster: filtered toolpath drops the 2 non-deposit-adjacent points',
+      len(filtered) == 6, 'got {} points: {}'.format(len(filtered), filtered.tolist()))
+check('raster: filtered toolpath keeps no travel-only segment spanning multiple layers',
+      float(filtered[:, 2].max() - filtered[:, 2].min()) <= 0.6 + 1e-9,
+      'z range {}'.format((filtered[:, 2].min(), filtered[:, 2].max())))
+
+# two points 0.4 apart along layer 0's own pass (both near its far edge,
+# x=6.9 and x=6.5, at z=0.2) must land close together in s - WITHOUT
+# filtering, x=6.9 snaps onto the end-of-build return segment (which also
+# sits at x=7, spanning all Z) while x=6.5 doesn't, producing a large jump.
+near_edge_close = coordinate_function(np.array([6.5, 0, 0.2]), 'toolpath_arc_length', toolpath=filtered)
+near_edge_far = coordinate_function(np.array([6.9, 0, 0.2]), 'toolpath_arc_length', toolpath=filtered)
+check('raster: two nearby points on the same layer stay close in s (no travel-segment hijack)',
+      abs(near_edge_far - near_edge_close) < 0.05,
+      's(x=6.5)={:.4f} s(x=6.9)={:.4f} diff={:.4f}'.format(
+          near_edge_close, near_edge_far, abs(near_edge_far - near_edge_close)))
+
+# on examples/wall's real toolpath.crs (20 layers, Z 0.4..4.0, so the
+# end-of-build return-to-origin segment spans a much larger Z range than
+# this 3-layer toy example) the unfiltered jump is large and directly
+# confirmed (see project memory) - this toy example is deliberately small
+# just to keep filter_deposit_segments' output easy to hand-verify above.
+
+try:
+    filter_deposit_segments(np.array([[0, 0, 0], [1, 0, 0]], dtype=float), np.array([0, 0]))
+    check('all-travel toolpath raises ValueError', False, 'did not raise')
+except ValueError:
+    check('all-travel toolpath raises ValueError', True)
 
 print('Toolpath arc-length tests\n' + '=' * 60)
 all_passed = True

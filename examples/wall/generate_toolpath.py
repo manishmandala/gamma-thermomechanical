@@ -11,14 +11,14 @@
 # travels a single centered Y track; the birth radius (see regen_birth.py)
 # must be wide enough to reach the outer columns from center in one pass.
 #
-# NOTE: element "birth" (activation) times are pre-baked into thinwall.k's
+# NOTE: element "birth" (activation) times are pre-baked into thinwall_discrete_bands.k's
 # *DEFINE_CURVE from this exact schedule. If you change SWEEP/DWELL/Z0/
 # LAYER_DZ/N_PASSES/Y_CENTER here, you MUST re-run regen_birth.py afterwards
 # or the laser and the deposited material will fall out of sync.
 
 X_L, X_R = -7.0, 7.0
 Y_CENTER = 0.0               # single centered track - each pass covers the full width
-Z0, LAYER_DZ, N_PASSES = 0.4, 0.2, 19   # 19 single-pass layers, 0.2 apart -> ends at 4.0, matches thinwall.k
+Z0, LAYER_DZ, N_PASSES = 0.4, 0.2, 19   # 19 single-pass layers, 0.2 apart -> ends at 4.0, matches thinwall_discrete_bands.k
 SWEEP = 1.0                  # seconds per single-direction pass
 DWELL = 1.0                  # cooling pause between layers (also doubles as the hop time) - shortened for fast testing
 HOP   = 0.1                  # time for the very first vertical move (avoids duplicate timestamps)

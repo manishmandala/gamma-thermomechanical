@@ -1,5 +1,5 @@
 # One-off utility: finds the node ID closest to the center of the wall
-# demo's substrate base (z=-4.0 plane) in thinwall.k, for use as a
+# demo's substrate base (z=-4.0 plane) in thinwall_discrete_bands.k, for use as a
 # --log-node target or manual sanity check. Not part of any pipeline.
 
 import cupy as cp
@@ -7,7 +7,7 @@ import numpy as np
 from gamma.simulator.gamma import domain_mgr
 cp.cuda.Device(0).use()
 
-domain = domain_mgr(filename='thinwall.k')
+domain = domain_mgr(filename='thinwall_discrete_bands.k')
 nodes = domain.nodes.get()
 base = np.isclose(nodes[:, 2], -4.0)          # base of substrate
 idx = np.where(base)[0]

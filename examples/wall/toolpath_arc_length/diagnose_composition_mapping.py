@@ -8,6 +8,7 @@
 
 import argparse
 import os
+import sys
 
 import numpy as np
 import pyvista as pv
@@ -15,8 +16,10 @@ import vtk
 import cupy as cp
 cp.cuda.Device(0).use()
 from gamma.simulator.gamma import domain_mgr, load_toolpath
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from composition_lib import (compute_centroid, compute_bounds, coordinate_function, composition_function,
-                              build_toolpath_arc_length_table, project_to_toolpath)
+                              build_toolpath_arc_length_table, project_to_toolpath, filter_deposit_segments)
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--dataset', required=True)
@@ -63,7 +66,8 @@ print('build region: matID {} ({} elements), substrate matID {}'.format(build_pi
 centroids = np.array([compute_centroid(nodes, build_node_ids[eid]) for eid in build_eids])
 
 # ---- toolpath-arc-length mapping ----
-toolpath_xyz = load_toolpath(os.path.join(args.dataset, args.toolpath))[:, 1:4]
+toolpath_raw = load_toolpath(os.path.join(args.dataset, args.toolpath))
+toolpath_xyz = filter_deposit_segments(toolpath_raw[:, 1:4], toolpath_raw[:, 4])
 arc_table = build_toolpath_arc_length_table(toolpath_xyz)
 total_length = arc_table[-1]
 arc_at, proj_dist, best_seg = project_to_toolpath(centroids, toolpath_xyz, arc_table, return_segment=True)

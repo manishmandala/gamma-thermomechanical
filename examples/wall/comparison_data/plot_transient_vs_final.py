@@ -1,3 +1,7 @@
+# Plots each run's true peak temperature against its final-frame
+# temperature, showing how much of the TI64/Cu/graded thermal gap washes
+# out by the end of the run.
+
 import glob
 
 import pyvista as pv
@@ -11,9 +15,9 @@ import matplotlib.pyplot as plt
 FINAL_TIME = 5.87
 
 RUNS = [
-    ("TI64", "../results_TI64", "#2a78d6"),
-    ("Cu", "../results_Cu", "#eb6834"),
-    ("Graded", "../results_graded_cu", "#1baf7a"),
+    ("TI64", "../results/pure_TI64", "#2a78d6"),
+    ("Cu", "../results/pure_Cu", "#eb6834"),
+    ("Graded", "../results/graded_cu", "#1baf7a"),
 ]
 
 peak_temp = {}

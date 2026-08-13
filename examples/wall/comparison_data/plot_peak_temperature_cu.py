@@ -1,3 +1,7 @@
+# Plots peak temperature across the pure-TI64, pure-Cu, and graded runs -
+# the high-thermal-contrast counterpart to plot_peak_temperature.py's
+# TI64/IN718 comparison.
+
 import glob
 import os
 
@@ -12,11 +16,11 @@ import matplotlib.pyplot as plt
 # differed. Cu's much smaller stable timestep made the original 0.5 build-depth
 # too slow to run in reasonable time, so this comparison uses a shallower
 # STOP_FRACTION=0.15 preview instead (still deep enough to show the gradient's
-# effect). The existing results_TI64/ run (from the TI64-vs-IN718 comparison)
+# effect). The existing results/pure_TI64/ run (from the TI64-vs-IN718 comparison)
 # went to STOP_FRACTION=0.5, so it's filtered here to only the frames within
 # the same sim-time window as the new Cu/graded runs, for a fair comparison.
 
-MAX_SIM_TIME = 5.87  # matches results_Cu / results_graded_cu's STOP_FRACTION=0.15 depth
+MAX_SIM_TIME = 5.87  # matches results/pure_Cu / results/graded_cu's STOP_FRACTION=0.15 depth
 
 # Central wall node at this shallower depth: geometric center of the deposited
 # region reached so far (x=0, mid-length; y=-0.1, mid-thickness; z=0.4,
@@ -28,9 +32,9 @@ MAX_SIM_TIME = 5.87  # matches results_Cu / results_graded_cu's STOP_FRACTION=0.
 CENTRAL_IDX = 7068
 
 RUNS = [
-    ("TI64", "../results_TI64", "#2a78d6"),
-    ("Cu", "../results_Cu", "#eb6834"),
-    ("Graded", "../results_graded_cu", "#1baf7a"),
+    ("TI64", "../results/pure_TI64", "#2a78d6"),
+    ("Cu", "../results/pure_Cu", "#eb6834"),
+    ("Graded", "../results/graded_cu", "#1baf7a"),
 ]
 
 peak_node_temp = {}

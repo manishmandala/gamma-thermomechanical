@@ -1,3 +1,6 @@
+# Renders a side-by-side image of the pure-Cu and graded-Cu runs at the
+# frame where their thermal contrast is largest.
+
 import pyvista as pv
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -11,8 +14,8 @@ FRAME = 'wall_0010.vtu'
 CLIM = [300, 1750]
 
 runs = [
-    ('Pure Cu', f'../results_Cu/{FRAME}'),
-    ('Graded TI64/Cu', f'../results_graded_cu/{FRAME}'),
+    ('Pure Cu', f'../results/pure_Cu/{FRAME}'),
+    ('Graded TI64/Cu', f'../results/graded_cu/{FRAME}'),
 ]
 
 images = []

@@ -1,6 +1,6 @@
 # Recomputes element birth (activation) times to match the current
-# toolpath.crs and rewrites thinwall.k's *DEFINE_CURVE block in place.
-# Run this any time generate_thinwall_demo_toolpath.py's schedule changes (SWEEP/DWELL/Z0/
+# toolpath.crs and rewrites thinwall_discrete_bands.k's *DEFINE_CURVE block in place.
+# Run this any time generate_toolpath.py's schedule changes (SWEEP/DWELL/Z0/
 # LAYER_DZ/N_PASSES/Y_CENTER) - the mesh geometry itself is untouched.
 #
 # RADIUS must be wide enough for a single centered pass (Y_CENTER=0.0) to
@@ -10,7 +10,7 @@
 import numpy as np
 import gamma.simulator.preprocessor as pre
 
-MESH_FILE = 'thinwall.k'
+MESH_FILE = 'thinwall_discrete_bands.k'
 TOOLPATH_FILE = 'toolpath.crs'
 RADIUS = 0.45
 PATH_RESOLUTION = 0.2

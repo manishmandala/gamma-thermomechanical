@@ -1,3 +1,6 @@
+# Plots peak temperature at the wall's central node across the pure-TI64,
+# pure-IN718, and graded runs.
+
 import glob
 import os
 
@@ -13,9 +16,9 @@ import matplotlib.pyplot as plt
 CENTRAL_IDX = 14302
 
 RUNS = [
-    ("TI64", "../results_TI64", "#2a78d6"),
-    ("IN718", "../results_IN718", "#eb6834"),
-    ("Graded", "../results_graded", "#1baf7a"),
+    ("TI64", "../results/pure_TI64", "#2a78d6"),
+    ("IN718", "../results/pure_IN718", "#eb6834"),
+    ("Graded", "../results/graded", "#1baf7a"),
 ]
 
 peak_node_temp = {}

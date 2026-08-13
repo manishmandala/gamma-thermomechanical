@@ -11,7 +11,7 @@
 # blended property-curve files - node geometry, birth times, and the
 # toolpath are untouched, so the laser schedule is unaffected.
 #
-# NOTE: thinwall.k's *PART block names are misleading - the part LABELED
+# NOTE: thinwall_discrete_bands.k's *PART block names are misleading - the part LABELED
 # "Substrate" (pid 1) is actually the above-ground deposited wall (z > 0),
 # and the part labeled "Build" (pid 2) is actually the below-ground base
 # plate (z < 0). TARGET_PID below is chosen by mesh geometry, asserted
@@ -45,7 +45,7 @@
 import os
 import numpy as np
 
-MESH_FILE = 'thinwall.k'
+MESH_FILE = 'thinwall_discrete_bands.k'
 PROP_DIR = '../0_properties'
 GRAD_DIR = os.path.join(PROP_DIR, 'graded_wall')
 TARGET_PID = 1   # the deposited wall (despite the *PART block calling it "Substrate")

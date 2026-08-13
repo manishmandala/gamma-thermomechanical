@@ -25,7 +25,7 @@ import subprocess
 import sys
 import tempfile
 
-WALL_DIR = os.path.dirname(os.path.abspath(__file__))
+WALL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO_ROOT = os.path.abspath(os.path.join(WALL_DIR, '..', '..'))
 
 results = []  # (label, passed, detail)
@@ -88,8 +88,8 @@ def check_prepare_composition(dataset_rel, kfile, mode):
                          '{} differs from git HEAD'.format(mode)))
 
 
-check_generator_script('gradient_material_continuous_TI64_IN718.py', 'thinwall_graded.k')
-check_generator_script('gradient_material_continuous_TI64_Cu.py', 'thinwall_graded_cu.k')
+check_generator_script('toolpath_arc_length/gradient_material_continuous_TI64_IN718.py', 'thinwall_graded.k')
+check_generator_script('toolpath_arc_length/gradient_material_continuous_TI64_Cu.py', 'thinwall_graded_cu.k')
 
 for mode in ('pure_inconel', 'pure_titanium', 'constant_inconel', 'constant_titanium'):
     check_prepare_composition('../incoming_dataset/part002_LP800_SSp10_H2.24_SSt3_LH0.9', '2.k', mode)

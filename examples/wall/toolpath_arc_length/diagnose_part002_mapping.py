@@ -15,6 +15,7 @@
 # Plus a printed statistics report (also saved as a .txt).
 
 import os
+import sys
 
 import numpy as np
 import pyvista as pv
@@ -22,6 +23,8 @@ import vtk
 import cupy as cp
 cp.cuda.Device(0).use()
 from gamma.simulator.gamma import domain_mgr, load_toolpath
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from composition_lib import (compute_centroid, compute_bounds, coordinate_function, composition_function,
                               build_toolpath_arc_length_table, project_to_toolpath)
 

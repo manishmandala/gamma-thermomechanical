@@ -1,9 +1,9 @@
 # Unified thermal(-mechanical) simulation runner for any wall-example .k
 # file - point it at a deck and an output folder via CLI args instead of
-# hand-editing a script per material/composition mode. Replaces the six
-# legacy_main_wall_*.py scripts (kept for reference, not used going
-# forward). This is the ONLY runner used throughout the toolpath-arc-length
-# composition project (examples/incoming_dataset/part00N_.../).
+# hand-editing a script per material/composition mode. This is the ONLY
+# runner used throughout the toolpath-arc-length composition project
+# (examples/incoming_dataset/part00N_.../) and the only way to start a
+# simulation anywhere in examples/wall/.
 
 import argparse
 import os
@@ -13,7 +13,7 @@ parser = argparse.ArgumentParser(
                  'Replaces the old per-material main_wall_<material>.py copies - '
                  'point it at any .k file and an output folder instead of hand-editing a script.')
 parser.add_argument('--k', required=True, help='input .k file, e.g. thinwall_IN718.k')
-parser.add_argument('--out', required=True, help='output folder for result frames, e.g. results_IN718')
+parser.add_argument('--out', required=True, help='output folder for result frames, e.g. results/pure_IN718')
 parser.add_argument('--toolpath', default='toolpath.crs',
                      help='toolpath .crs file, resolved against --input-data-dir (not the cwd) - the '
                           '*TOOL_FILE line inside the .k is ignored by this solver, so this is the only '

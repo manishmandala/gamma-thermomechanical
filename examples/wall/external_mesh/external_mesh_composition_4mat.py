@@ -1,9 +1,10 @@
 # Generates sol_100_control_graded_4mat.k - the true N=4 counterpart of
-# rowan_mesh_composition.py. That earlier script collapsed Rowan's real
-# 4-material composition simplex (sol_100.vtu's cell_data['mat'], columns
-# IN625/SS316/HA25/MCrAlY per the same inherited-not-confirmed ordering) down
-# to a 2-material blend, discarding columns 2/3 entirely, because gamma.py's
-# graded-material solver only supported exactly 2 endpoints at the time.
+# external_mesh_composition.py. That earlier script collapsed the mesh's
+# real 4-material composition simplex (sol_100.vtu's cell_data['mat'],
+# columns IN625/SS316/HA25/MCrAlY per the same inherited-not-confirmed
+# ordering) down to a 2-material blend, discarding columns 2/3 entirely,
+# because gamma.py's graded-material solver only supported exactly 2
+# endpoints at the time.
 #
 # Now that gamma.py supports N materials, this writes all 4 columns straight
 # through - no collapsing, no discarding. Same IN718/1018 proxies as before
@@ -16,15 +17,16 @@
 # being read and blended rather than silently defaulting to one material.
 # Since HA25/MCrAlY are always minor admixtures in this mesh (never the
 # dominant material in any element - min(col0+col1)=0.65 across all elements,
-# per rowan_mesh_composition.py's original analysis), the physical inaccuracy
-# of these two proxies has limited impact on the overall thermal result.
+# per external_mesh_composition.py's original analysis), the physical
+# inaccuracy of these two proxies has limited impact on the overall thermal
+# result.
 
 import os
 import meshio
 import numpy as np
 
-MESH_FILE = 'sol_100.vtu'
-MESH_FILE_OUT = 'sol_100_control_graded_4mat.k'
+MESH_FILE = 'external_mesh/sol_100.vtu'
+MESH_FILE_OUT = 'external_mesh/sol_100_control_graded_4mat.k'
 PROP_DIR_IN718 = '../0_properties'
 PROP_DIR_1018 = '../data/materials'
 PROP_DIR_CPTI = '../0_properties'
@@ -104,7 +106,7 @@ mat_block = (
 part_block = (
     '*PART\n'
     '$HWCOLOR COMPS     {}       5\n'.format(GRAD_ID) +
-    'Imported_Part_Graded_Rowan_4Material_Composition\n' +
+    'Imported_Part_Graded_ExternalMesh_4Material_Composition\n' +
     '      %5d         0     %5d\n' % (GRAD_ID, GRAD_ID)
 )
 
