@@ -78,6 +78,156 @@ def build_toolpath_arc_length_table(toolpath_xyz):
     return np.concatenate([[0.0], np.cumsum(seglen)])
 
 
+def simulate_first_order_composition(times, phi_command, tau, delay=0.0):
+    """First-order-plus-dead-time (FOPDT) model of a feeder/mixing system's
+    response to a commanded composition signal:
+
+        tau * dphi/dt + phi(t) = phi_command(t - delay)
+
+    times: (N,) real deposition time per sample, strictly the same convention
+    as this project's .crs time column (non-decreasing; see generate_toolpath.py).
+    phi_command: (N,) commanded composition fraction at each time sample -
+    typically a part-design target field phi(x,y,z) evaluated at the toolpath's
+    position at that time (see build_toolpath_composition_table).
+    tau: response time constant, same units as `times`. tau=0 means an
+    infinitely fast system - output tracks (delayed) command exactly. Must be
+    >= 0.
+    delay: pure transport delay (dead time), same units as `times`. Applied by
+    resampling phi_command at (times - delay) via linear interpolation, holding
+    phi_command[0] for any t < times[0] - delay (system hasn't received a
+    command yet, so it's assumed to start at the initial command value rather
+    than undefined/zero). Must be >= 0.
+
+    Returns phi_actual, an (N,) array aligned index-for-index with `times` -
+    the composition the system actually produces once its own dynamics are
+    accounted for, always lagging behind (never leading) phi_command.
+
+    Uses the exact zero-order-hold discretization, not an Euler approximation:
+    over each interval [times[i-1], times[i]], phi_command is held constant at
+    its value at times[i-1] (this matches how the .crs toolpath already works -
+    a state/position holds until the NEXT waypoint changes it), so the closed-
+    form solution of the linear ODE over that interval is exact for any
+    tau > 0:
+
+        phi_actual[i] = phi_actual[i-1]*exp(-dt/tau) + phi_command[i-1]*(1-exp(-dt/tau))
+
+    phi_actual[0] is initialized to phi_command[0] (delayed) - the system is
+    assumed to already be at steady-state with the build's starting command
+    before deposition begins, rather than starting from an arbitrary/undefined
+    state.
+    """
+    times = np.asarray(times, dtype=float)
+    phi_command = np.asarray(phi_command, dtype=float)
+    if len(times) != len(phi_command):
+        raise ValueError("times length ({}) doesn't match phi_command ({})".format(
+            len(times), len(phi_command)))
+    if len(times) == 0:
+        raise ValueError("simulate_first_order_composition: got zero samples")
+    if tau < 0:
+        raise ValueError("tau must be >= 0, got {}".format(tau))
+    if delay < 0:
+        raise ValueError("delay must be >= 0, got {}".format(delay))
+
+    if delay > 0:
+        phi_cmd = np.interp(times - delay, times, phi_command, left=phi_command[0])
+    else:
+        phi_cmd = phi_command
+
+    if tau == 0:
+        # infinitely fast system: output IS the (delayed) command, no lag
+        return phi_cmd.copy()
+
+    phi_actual = np.empty_like(phi_cmd)
+    phi_actual[0] = phi_cmd[0]
+    for i in range(1, len(times)):
+        dt = times[i] - times[i - 1]
+        if dt <= 0:
+            # simultaneous/out-of-order timestamps: no time elapsed, no change
+            phi_actual[i] = phi_actual[i - 1]
+            continue
+        decay = np.exp(-dt / tau)
+        phi_actual[i] = phi_actual[i - 1] * decay + phi_cmd[i - 1] * (1 - decay)
+    return phi_actual
+
+
+def build_target_field_from_mesh(mesh_points, mesh_values):
+    """Wraps a mesh that already carries a per-entity target composition
+    value into the phi_target_fn(x, y, z) callable build_toolpath_composition_table
+    expects - this is the "the input is the mesh" case: the part designer's
+    intent arrives as a field already baked onto a mesh (e.g. an externally
+    supplied design mesh's cell_data, same shape as
+    external_mesh/external_mesh_composition.py's sol_100.vtu cell_data['mat'];
+    or per-element compute_centroid() output paired with a composition array
+    computed some other way) - not a closed-form function of position.
+
+    mesh_points: (K,3) array - one point per mesh entity that carries a
+    composition value (element centroids, node coordinates, whichever
+    `mesh_values` is aligned to).
+    mesh_values: (K,) array - the target composition fraction at each of
+    those points, index-aligned with mesh_points.
+
+    Returns phi_target_fn(x, y, z) -> float: nearest-neighbor lookup via a
+    KD-tree (same approach already used for spatial lookups in this
+    directory's compare_composition_modes_part*.py) - returns mesh_values[i]
+    for whichever mesh_points[i] is closest to the query point. Deliberately
+    nearest-neighbor, not interpolation: the target field IS the mesh's data,
+    verbatim, not a smoothed version of it - same rationale as
+    project_to_toolpath's nearest-SEGMENT (not blended) search.
+
+    The KD-tree is built once, up front (O(K log K)); each call to the
+    returned phi_target_fn is then a single O(log K) query - cheap even for
+    a large design mesh, since build_toolpath_composition_table calls it
+    once per TOOLPATH WAYPOINT (typically tens to low thousands), not once
+    per simulation element.
+    """
+    from scipy.spatial import cKDTree
+    mesh_points = np.asarray(mesh_points, dtype=float)
+    mesh_values = np.asarray(mesh_values, dtype=float)
+    if len(mesh_points) != len(mesh_values):
+        raise ValueError("mesh_points length ({}) doesn't match mesh_values ({})".format(
+            len(mesh_points), len(mesh_values)))
+    if len(mesh_points) == 0:
+        raise ValueError("build_target_field_from_mesh: got an empty mesh")
+    tree = cKDTree(mesh_points)
+
+    def phi_target_fn(x, y, z):
+        _dist, idx = tree.query([x, y, z])
+        return float(mesh_values[idx])
+
+    return phi_target_fn
+
+
+def build_toolpath_composition_table(toolpath_xyz, toolpath_time, phi_target_fn, tau, delay=0.0):
+    """Converts a part-design target composition field into the composition
+    actually achievable along the toolpath, given feeder/mixing dynamics.
+
+    toolpath_xyz: (N,3) waypoints, toolpath_time: (N,) real deposition time per
+    waypoint (this project's .crs time column), both already in deposition
+    order and index-aligned (toolpath_time[i] is when the head was at
+    toolpath_xyz[i]).
+    phi_target_fn: callable (x, y, z) -> composition fraction in [0,1] - the
+    part designer's spatial spec, evaluated at each waypoint's real position.
+    This is intentionally left as a plain callable rather than a fixed format
+    (e.g. closed-form function, region/label lookup, interpolated field from a
+    CAD tool) - any of those can be wrapped in one.
+    tau, delay: see simulate_first_order_composition.
+
+    Returns phi_actual, an (N,) array index-aligned with toolpath_xyz - the
+    composition the system actually produces at each waypoint once its
+    response dynamics are accounted for. Pass this into project_to_toolpath's
+    `extra_tables` (e.g. extra_tables={'phi': phi_actual}) to assign each
+    element the composition actually deposited at its nearest point on the
+    path, using the exact same per-segment interpolation as arc length.
+    """
+    toolpath_xyz = np.asarray(toolpath_xyz, dtype=float)
+    toolpath_time = np.asarray(toolpath_time, dtype=float)
+    if len(toolpath_time) != len(toolpath_xyz):
+        raise ValueError("toolpath_time length ({}) doesn't match toolpath_xyz ({})".format(
+            len(toolpath_time), len(toolpath_xyz)))
+    phi_command = np.array([phi_target_fn(x, y, z) for x, y, z in toolpath_xyz], dtype=float)
+    return simulate_first_order_composition(toolpath_time, phi_command, tau, delay=delay)
+
+
 def filter_deposit_segments(toolpath_xyz, state):
     """Reduces a raw toolpath down to only the segments where material was
     actually being deposited, dropping travel/repositioning moves.
@@ -131,7 +281,8 @@ def filter_deposit_segments(toolpath_xyz, state):
     return toolpath_xyz[keep]
 
 
-def project_to_toolpath(centroids, toolpath_xyz, cumulative_arc_length, chunk_size=2000, return_segment=False):
+def project_to_toolpath(centroids, toolpath_xyz, cumulative_arc_length, chunk_size=2000, return_segment=False,
+                         extra_tables=None):
     """Projects each centroid onto the closest point on the toolpath's
     polyline - nearest SEGMENT, not nearest waypoint (see this module's
     header / coordinate_function's docstring for why nearest-waypoint alone
@@ -149,6 +300,16 @@ def project_to_toolpath(centroids, toolpath_xyz, cumulative_arc_length, chunk_si
     additionally returns which segment index (0-based, into
     toolpath_xyz[:-1]) each centroid mapped to - (kept for diagnostics - see
     diagnose_part002_mapping.py).
+
+    extra_tables: optional dict {name: (N,) array} of additional per-waypoint
+    scalar values - e.g. a phi_actual table from build_toolpath_composition_table
+    - to interpolate at each centroid's projected point using the EXACT same
+    (segment, t) as arc length itself: value = table[seg] + t*(table[seg+1] -
+    table[seg]). When supplied, one more dict {name: (M,) array} (or {name:
+    float} for single-centroid input) is appended to the return tuple, after
+    whatever return_segment already adds. Omit for the original 2/3-tuple
+    return shape - this is purely additive, every existing call site is
+    unaffected.
 
     Algorithm, per centroid: for every segment (p_i -> p_{i+1}), compute the
     projection fraction t = dot(centroid - p_i, p_{i+1} - p_i) / |p_{i+1} - p_i|^2,
@@ -194,6 +355,17 @@ def project_to_toolpath(centroids, toolpath_xyz, cumulative_arc_length, chunk_si
     dist_out = np.empty(n)
     seg_out = np.empty(n, dtype=int)
 
+    extra_in = {}
+    extra_out = {}
+    if extra_tables:
+        for name, values in extra_tables.items():
+            values = np.asarray(values, dtype=float)
+            if len(values) != len(toolpath_xyz):
+                raise ValueError("extra_tables[{!r}] length ({}) doesn't match toolpath_xyz ({})".format(
+                    name, len(values), len(toolpath_xyz)))
+            extra_in[name] = values
+            extra_out[name] = np.empty(n)
+
     for start in range(0, n, chunk_size):
         chunk = pts[start:start + chunk_size]                          # (Mc,3)
         w = chunk[:, None, :] - p0[None, :, :]                         # (Mc,S,3)
@@ -213,14 +385,20 @@ def project_to_toolpath(centroids, toolpath_xyz, cumulative_arc_length, chunk_si
             + best_t * (cumulative_arc_length[best_seg + 1] - cumulative_arc_length[best_seg]))
         dist_out[start:start + chunk_size] = np.sqrt(dist_sq[rows, best_seg])
         seg_out[start:start + chunk_size] = best_seg
+        for name, values in extra_in.items():
+            extra_out[name][start:start + chunk_size] = (
+                values[best_seg] + best_t * (values[best_seg + 1] - values[best_seg]))
 
     if single:
-        if return_segment:
-            return float(arc_out[0]), float(dist_out[0]), int(seg_out[0])
-        return float(arc_out[0]), float(dist_out[0])
-    if return_segment:
-        return arc_out, dist_out, seg_out
-    return arc_out, dist_out
+        base = (float(arc_out[0]), float(dist_out[0]), int(seg_out[0])) if return_segment \
+            else (float(arc_out[0]), float(dist_out[0]))
+        if extra_tables:
+            return base + ({name: float(arr[0]) for name, arr in extra_out.items()},)
+        return base
+    base = (arc_out, dist_out, seg_out) if return_segment else (arc_out, dist_out)
+    if extra_tables:
+        return base + (extra_out,)
+    return base
 
 
 def coordinate_function(centroid, mode, bounds=None, toolpath=None, toolpath_arc=None, chunk_size=2000):

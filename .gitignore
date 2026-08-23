@@ -17,3 +17,18 @@ temperature_history.csv
 results/
 results_*/
 *_backup.py
+
+# large raw/generated dataset batches - too large for git, shared via Drive instead
+examples/incoming_dataset/*.zip
+examples/incoming_dataset/*.log
+examples/incoming_dataset/_run_logs/
+examples/incoming_dataset/part006/
+examples/incoming_dataset/part007/
+examples/incoming_dataset/part008/
+examples/incoming_dataset/part009/
+examples/incoming_dataset/part010/
+examples/incoming_dataset/part013/
+examples/incoming_dataset/part014/
+examples/incoming_dataset/part015/
+examples/incoming_dataset/part016/
+examples/incoming_dataset/part017/
